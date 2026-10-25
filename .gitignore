@@ -30,3 +30,6 @@ docs/reference/
 data/reports/*.json
 desktop/_*.txt
 desktop/_*.log
+
+# 发行打包产物（只上传到 Release，不进仓库）
+release/
