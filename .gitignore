@@ -1,0 +1,32 @@
+# 依赖与产物
+__pycache__/
+*.py[cod]
+.pytest_cache/
+build/
+dist/
+*.spec
+*.part
+
+# 桌面壳
+desktop/node_modules/
+desktop/package-lock.json
+
+# 数据：不随仓库分发（版权归官方，运行时从社区数据仓拉取）
+data/raw/
+data/normalized/
+data/llm/
+data/reports/*.md
+!data/reports/.gitkeep
+
+# 本地环境
+.env
+.env.*
+*.log
+_run.out
+_run.err
+
+# 第三方调研资料（仅本地参考，不随仓库分发）
+docs/reference/
+data/reports/*.json
+desktop/_*.txt
+desktop/_*.log

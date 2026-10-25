@@ -1,0 +1,14 @@
+{
+  "name": "endfield-team-sim-desktop",
+  "version": "0.1.0-beta",
+  "private": true,
+  "description": "终末地配队模拟 · 桌面壳（Electron）",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:nodl": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

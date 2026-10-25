@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>终末地配队模拟</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c2230; --line:#2a3140;
+    --fg:#e6edf3; --dim:#8b949e; --acc:#4ea1ff; --warn:#ffb454;
+    --cold:#4ea1ff; --hot:#ff7a59; --must:#3fb950; --ban:#f85149;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:14px/1.5 "Microsoft YaHei",system-ui,-apple-system,sans-serif;}
+  header{padding:10px 16px;border-bottom:1px solid var(--line);
+         display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--panel)}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  header .ver{color:var(--dim);font-size:12px}
+  main{display:grid;grid-template-columns:320px 1fr;height:calc(100vh - 56px)}
+  #side{border-right:1px solid var(--line);overflow:auto;padding:12px;background:var(--panel)}
+  #main{overflow:auto;padding:16px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+  label{color:var(--dim);font-size:12px}
+  input[type=text],input[type=number],select{
+    background:var(--panel2);border:1px solid var(--line);color:var(--fg);
+    padding:5px 8px;border-radius:6px;font-size:13px;min-width:0}
+  input[type=text]{flex:1}
+  button{background:var(--acc);color:#04121f;border:0;border-radius:6px;
+         padding:7px 12px;font-weight:600;cursor:pointer;font-size:13px}
+  button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+  button:disabled{opacity:.5;cursor:default}
+  .op{display:flex;gap:8px;align-items:center;padding:5px 6px;border-radius:6px;
+      cursor:pointer;border:1px solid transparent}
+  .op:hover{background:var(--panel2)}
+  .op.must{border-color:var(--must);background:rgba(63,185,80,.12)}
+  .op.ban{border-color:var(--ban);background:rgba(248,81,73,.12);opacity:.6}
+  .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tag{font-size:11px;color:var(--dim)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+        padding:12px;margin-bottom:12px}
+  .card h3{margin:0 0 8px;font-size:15px;display:flex;gap:10px;align-items:center}
+  .badge{font-size:11px;padding:2px 6px;border-radius:999px;background:var(--panel2);
+         color:var(--dim);border:1px solid var(--line)}
+  .kpi{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px}
+  .kpi div{font-size:12px;color:var(--dim)}
+  .kpi b{display:block;font-size:18px;color:var(--fg)}
+  .cold b{color:var(--cold)} .hot b{color:var(--hot)}
+  .lane{display:grid;grid-template-columns:96px 1fr;gap:8px;align-items:center;
+        margin:3px 0}
+  .lane .lb{font-size:12px;color:var(--dim);text-align:right;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .track{position:relative;height:22px;background:var(--panel2);border-radius:4px;
+         border:1px solid var(--line)}
+  .bar{position:absolute;top:3px;height:16px;border-radius:3px;
+       background:var(--acc);opacity:.85}
+  .bar.combo{background:#a371f7} .bar.ultimate{background:#ff7a59}
+  .bar.power_attack{background:#e3b341} .bar.enemy{background:#f85149;opacity:.45}
+  .hit{position:absolute;top:0;width:2px;height:22px;background:#fff;opacity:.75}
+  .ticks{display:grid;grid-template-columns:96px 1fr;gap:8px;color:var(--dim);font-size:11px}
+  .ticks .t{position:relative;height:14px;border-top:1px solid var(--line)}
+  .ticks .t span{position:absolute;transform:translateX(-50%);top:2px}
+  table{border-collapse:collapse;width:100%;font-size:12px;margin-top:8px}
+  th,td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left}
+  th{color:var(--dim);font-weight:500}
+  .muted{color:var(--dim);font-size:12px}
+  .warn{color:var(--warn)}
+  .tabs{display:flex;gap:6px;margin:8px 0}
+  .tabs button{padding:5px 10px;font-size:12px}
+  .tabs button.on{background:var(--acc)}
+  .tabs button.off{background:transparent;border:1px solid var(--line);color:var(--fg)}
+  #status{font-size:12px;color:var(--dim)}
+</style>
+</head>
+<body>
+<header>
+  <h1>终末地配队模拟</h1>
+  <span class="ver" id="ver">加载中…</span>
+  <span class="muted">点击左侧干员：一次=必须包含，两次=禁止，三次=清除</span>
+</header>
+
+<main>
+  <aside id="side">
+    <div class="row">
+      <input id="q" type="text" placeholder="搜索名字 / TAG" />
+      <select id="felem">
+        <option value="">全部元素</option>
+        <option>物理</option><option>灼热</option><option>电磁</option>
+        <option>寒冷</option><option>自然</option>
+      </select>
+    </div>
+    <div class="row">
+      <label>窗口(s)</label><input id="dur" type="number" value="40" style="width:64px"/>
+      <label>Top</label><input id="top" type="number" value="3" style="width:52px"/>
+      <label>评估</label><input id="eval" type="number" value="8" style="width:52px"/>
+    </div>
+    <div class="row">
+      <button id="go">推荐配队</button>
+      <button id="clr" class="ghost">清空</button>
+    </div>
+    <div id="status"></div>
+    <div id="ops"></div>
+  </aside>
+
+  <section id="main">
+    <div id="result" class="muted">选好干员后点「推荐配队」。</div>
+  </section>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const ELEM_COLOR = {物理:'#8b949e',灼热:'#fe623c',电磁:'#ffbe02',寒冷:'#21c5ce',自然:'#9edc23'};
+let META = null, STATE = {}, CURRENT = null, MODE = 'cold';
+
+function el(tag, cls, txt){ const e=document.createElement(tag); if(cls)e.className=cls;
+  if(txt!=null)e.textContent=txt; return e; }
+
+async function boot(){
+  const r = await fetch('/api/meta'); META = await r.json();
+  $('#ver').textContent = `数据集 ${META.version} · ${META.count} 名可用干员`;
+  META.operators.forEach(o => STATE[o.id] = 0);   // 0 中性 / 1 必须 / 2 禁止
+  renderOps();
+}
+
+function renderOps(){
+  const q = ($('#q').value||'').trim().toLowerCase();
+  const el0 = $('#felem').value;
+  const box = $('#ops'); box.innerHTML='';
+  META.operators
+    .filter(o => (!q || o.name.toLowerCase().includes(q) ||
+                  (o.tags||[]).some(t => t.toLowerCase().includes(q))) &&
+                 (!el0 || o.element === el0))
+    .forEach(o => {
+      const row = el('div','op' + (STATE[o.id]===1?' must':STATE[o.id]===2?' ban':''));
+      const dot = el('span','dot'); dot.style.background = ELEM_COLOR[o.element] || '#666';
+      row.appendChild(dot);
+      row.appendChild(el('span','name', o.name));
+      row.appendChild(el('span','tag', `${o.rarity}★ ${o.profession||''}`));
+      row.onclick = () => { STATE[o.id] = (STATE[o.id]+1)%3; renderOps(); };
+      box.appendChild(row);
+    });
+}
+
+function picked(kind){ return Object.keys(STATE).filter(k => STATE[k]===kind); }
+
+async function runTeam(){
+  $('#go').disabled = true; $('#status').textContent = '搜索中…';
+  const must = picked(1), ban = picked(2);
+  try{
+    const r = await fetch('/api/team', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({must, ban, duration:+$('#dur').value,
+                            top:+$('#top').value, evaluate:+$('#eval').value})});
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    renderTeams(data);
+    $('#status').textContent = `评估了 ${data.evaluated} 队`;
+  }catch(e){ $('#result').textContent = '出错：'+e.message; }
+  finally{ $('#go').disabled = false; }
+}
+
+function renderTeams(data){
+  const box = $('#result'); box.innerHTML='';
+  if(!data.top || !data.top.length){ box.textContent='没有满足约束的队伍。'; return; }
+  data.top.forEach((t,i) => {
+    const c = el('div','card');
+    const h = el('h3'); h.appendChild(el('span',null,`${i+1}. ${t.names.join(' / ')}`));
+    h.appendChild(el('span','badge',`评分 ${Math.round(t.score)}`));
+    c.appendChild(h);
+
+    const kpi = el('div','kpi');
+    kpi.appendChild(kpiBox('cold','冷启动 DPS', t.cold.result.dps, t.cold.result.total_damage));
+    kpi.appendChild(kpiBox('hot','热启动 DPS', t.hot.result.dps, t.hot.result.total_damage));
+    c.appendChild(kpi);
+
+    const reasons = el('div','muted'); reasons.textContent = t.reason.join(' · '); c.appendChild(reasons);
+
+    const tabs = el('div','tabs');
+    ['cold','hot'].forEach(m => {
+      const b = el('button', MODE===m?'on':'off', m==='cold'?'冷启动轴':'热启动轴');
+      b.onclick = () => { CURRENT = {team:t.team, i:i}; loadAxis(t, m, c); };
+      tabs.appendChild(b);
+    });
+    c.appendChild(tabs);
+    const holder = el('div'); holder.id = 'axis-'+i; c.appendChild(holder);
+    box.appendChild(c);
+    if(i===0) loadAxis(t, MODE, c);
+  });
+}
+
+function kpiBox(cls,label,dps,dmg){
+  const d = el('div',cls);
+  d.appendChild(document.createTextNode(label));
+  const b = el('b',null, Math.round(dps).toLocaleString());
+  d.appendChild(b);
+  d.appendChild(document.createTextNode(`总伤 ${Math.round(dmg).toLocaleString()}`));
+  return d;
+}
+
+async function loadAxis(t, mode, card){
+  const holder = card.querySelector('[id^=axis-]') || el('div');
+  holder.innerHTML = '<div class="muted">计算中…</div>';
+  const q = new URLSearchParams({team:t.team.join(','), mode, duration:$('#dur').value});
+  const r = await fetch('/api/axis?'+q.toString());
+  const data = await r.json();
+  if(data.error){ holder.innerHTML = '<div class="warn">'+data.error+'</div>'; return; }
+  holder.innerHTML = '';
+  holder.appendChild(renderAxis(data.rotation.result, t));
+}
+
+function renderAxis(res, t){
+  const wrap = el('div');
+  const dur = res.duration_frames/30;
+  const lanes = {};
+  t.team.forEach(id => lanes[id] = t.name_map[id] || id);
+  const laneBox = el('div');
+  const order = Object.keys(lanes);
+
+  function lane(name, events, cls){
+    const l = el('div','lane');
+    l.appendChild(el('div','lb', name));
+    const tr = el('div','track');
+    events.forEach(ev => {
+      const s = ev.frame/30, e = Math.max(ev.commit_end||ev.frame, ev.frame+1)/30;
+      const b = el('div','bar '+(ev.bar||''));
+      b.style.left = (s/dur*100)+'%';
+      b.style.width = Math.max(0.4,(e-s)/dur*100)+'%';
+      b.title = `${ev.label}  ${s.toFixed(2)}s`;
+      tr.appendChild(b);
+      (ev.hits||[]).forEach(hf => {
+        const h = el('div','hit'); h.style.left = ((hf/30)/dur*100)+'%';
+        tr.appendChild(h);
+      });
+    });
+    l.appendChild(tr);
+    return l;
+  }
+
+  order.forEach(id => {
+    const evs = (res.timeline||[]).filter(e => e.kind==='cast' && e.op===id)
+      .map(e => ({...e, bar: e.slot}));
+    laneBox.appendChild(lane(lanes[id], evs));
+  });
+  const enemy = (res.timeline||[]).filter(e => e.kind==='enemy_attack')
+    .map(e => ({frame:e.frame, commit_end:e.frame, label:e.label, bar:'enemy', hits:[]}));
+  laneBox.appendChild(lane('敌人', enemy));
+  wrap.appendChild(laneBox);
+
+  const ticks = el('div','ticks');
+  ticks.appendChild(el('div'));
+  const tk = el('div','t'); 
+  const step = dur > 60 ? 10 : 5;
+  for(let s=0;s<=dur;s+=step){ const sp=el('span',null,s+'s');
+    sp.style.left=(s/dur*100)+'%'; tk.appendChild(sp); }
+  ticks.appendChild(tk); wrap.appendChild(ticks);
+
+  const kpi = el('div','kpi');
+  kpi.appendChild(kpiBox('cold','DPS', res.dps, res.total_damage));
+  kpi.appendChild(kpiBox('cold','合法性', res.legality_ok?1:0, 0).cloneNode(true));
+  wrap.appendChild(kpi);
+
+  const contrib = el('div','muted');
+  const total = Math.max(1,res.total_damage);
+  contrib.textContent = '贡献：' + Object.entries(res.per_operator||{})
+    .sort((a,b)=>b[1]-a[1])
+    .map(([cid,d]) => `${(t.name_map||{})[cid]||cid} ${(d/total*100).toFixed(0)}%`).join(' · ');
+  wrap.appendChild(contrib);
+
+  if(res.legality_issues && res.legality_issues.length){
+    const w = el('div','warn','合法性问题：'+res.legality_issues.slice(0,3).join('; '));
+    wrap.appendChild(w);
+  }
+  const tb = el('table');
+  tb.innerHTML = '<tr><th>时间(s)</th><th>结束(s)</th><th>动作</th><th>命中(s)</th></tr>';
+  (res.timeline||[]).filter(e=>e.kind==='cast'||e.kind==='enemy_attack'||e.kind==='stagger')
+    .sort((a,b)=>a.frame-b.frame)
+    .forEach(e => {
+      const tr = el('tr');
+      tr.innerHTML = `<td>${(e.frame/30).toFixed(2)}</td>`+
+        `<td>${((e.commit_end||e.frame)/30).toFixed(2)}</td>`+
+        `<td>${e.label||e.kind}</td>`+
+        `<td>${(e.hits||[]).map(h=>(h/30).toFixed(2)).join(', ')}</td>`;
+      tb.appendChild(tr);
+    });
+  wrap.appendChild(tb);
+
+  if(res.warnings && res.warnings.length){
+    const w = el('div','muted');
+    w.textContent = '注意：' + res.warnings.join('；');
+    wrap.appendChild(w);
+  }
+  return wrap;
+}
+
+$('#go').onclick = runTeam;
+$('#clr').onclick = () => { Object.keys(STATE).forEach(k=>STATE[k]=0); renderOps(); MODE='cold'; };
+$('#q').oninput = renderOps;
+$('#felem').onchange = renderOps;
+boot();
+</script>
+</body>
+</html>
