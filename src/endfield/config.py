@@ -149,18 +149,17 @@ GUESSED: dict[str, dict] = {
     "SP_MAX": {"value": 300, "unit": "point", "source": "wiki",
                "note": "全队共享 3 段技力，1 段 = 100"},
     "SP_REGEN_PER_SEC": {"value": 8.0, "unit": "point/s",
-                         "source": "estimate",
+                         "source": "wiki Skill_Points（8 SP/s）",
                          "note": "技力自然恢复速率：客户端表里只有修正项"
                                  "（buff_dung_atb_recoverspeed 的 triggerInterval=-1、"
                                  "ratio=-0.7 等），基础速率在引擎侧，仍需实测"},
-    "SP_GAIN_HEAVY": {"value": 100, "unit": "point",
-                      "source": "BuffData:buff_dung_atb_add_lastnormalattack",
-                      "note": "重击命中回复技力：黑板 atb=1.0，按 100 点/段换算"},
+    "SP_GAIN_HEAVY": {"value": 20, "unit": "point",
+                      "source": "SkillPatchTable attack5 黑板 atb（15~30，按干员）",
+                      "note": "重击回技力取该干员 attack5 的 atb 值；这里只是兜底"},
     "SP_GAIN_EXECUTE": {"value": 100, "unit": "point", "source": "wiki 教学页",
                         "note": "处决回复一定技力（wiki_tut_bat_execute_1），数值未单列，暂按 1 段"},
-    "SP_GAIN_PERFECT_DODGE": {"value": 100, "unit": "point",
-                              "source": "BuffData:buff_dung_atb_add_perfectdodge",
-                              "note": "极限闪避回复技力：黑板 atb=1.0"},
+    "SP_GAIN_PERFECT_DODGE": {"value": 7.5, "unit": "point",
+                              "source": "wiki Skill_Points（约 7.5，且暂停自然回复 0.5s）"},
     "SP_GAIN_KILL": {"value": 50, "unit": "point",
                      "source": "BuffData:buff_dung_atb_add_kill",
                      "note": "击杀回复技力：黑板 atb=0.5"},
@@ -187,9 +186,8 @@ GUESSED: dict[str, dict] = {
                       "note": "主属性对攻击力的加成系数"},
     "ATK_RATE_SUB": {"value": 0.002, "source": "BattleConst.atkRateOfSub",
                      "note": "副属性对攻击力的加成系数"},
-    "SKILL_LEVEL_DEFAULT": {"value": 7, "source": "assumption",
-                            "note": "默认技能等级（0 氪/常规培养的中位）"},
-    "OPERATOR_LEVEL_DEFAULT": {"value": 80, "source": "assumption"},
+    "SKILL_LEVEL_DEFAULT": {"value": 12, "source": "default: 满技能"},
+    "OPERATOR_LEVEL_DEFAULT": {"value": 90, "source": "default: 满级"},
 }
 
 

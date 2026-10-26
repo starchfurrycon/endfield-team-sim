@@ -34,8 +34,8 @@ from . import reactions as rxmod
 class Scenario:
     team: list[str]
     duration_s: float = 60.0
-    level: int = 80
-    skill_level: int = 7
+    level: int = 90
+    skill_level: int = 12
     enemy_def: float = 100.0
     enemy_res: float = 0.0
     enemy_poise: float = 100.0
@@ -43,7 +43,7 @@ class Scenario:
     attack_interval_frames: int = 240
     start_energy: str = "cold"          # cold | hot
     weapon_atk: float = 0.0        # 额外的武器 ATK（覆盖用）
-    weapon_level: int = 80          # 默认武器等级
+    weapon_level: int = 90          # 默认武器等级（满级）
     main: str | None = None
     seed: int = 0
     # 主控以外的干员会自动普攻（游戏内教学页 wiki_tut_bat_team_1）
@@ -792,8 +792,11 @@ class Battle:
                 self.energy[cid] = min(self._energy_cap(cid),
                                        self.energy.get(cid, 0.0) + float(gain))
         if heavy:
-            self.sp = min(config.guess("SP_MAX"),
-                          self.sp + config.guess("SP_GAIN_HEAVY"))
+            # 重击回技力按该干员 attack5 的黑板 atb（wiki：15~30，按人不同）
+            gain = float(lv.multipliers.get("atb") or 0.0)
+            if gain <= 0:
+                gain = config.guess("SP_GAIN_HEAVY")
+            self.sp = min(config.guess("SP_MAX"), self.sp + gain)
             self._open_windows_for("on_heavy_attack", start + commit)
         if sk.slot == "battle_skill":
             self._open_windows_for("on_skill_hit", start + commit)

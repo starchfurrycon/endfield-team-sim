@@ -211,7 +211,7 @@ class TestBlackboardMods(unittest.TestCase):
         for sk in self.op.skills.values():
             if sk.slot not in ("battle_skill", "combo_skill", "ultimate"):
                 continue
-            base = sk.total_multiplier(7)
+            base = sk.total_multiplier(b.sc.skill_level)
             scaled = b._scaled_mult(cid, sk)
             if base <= 0:
                 continue
@@ -222,7 +222,8 @@ class TestBlackboardMods(unittest.TestCase):
         cid = self.op.char_id
         b0 = Battle(self.ds, Scenario(team=[cid], potential_level=0))
         sk = next(s for s in self.op.skills.values() if s.slot == "battle_skill")
-        self.assertAlmostEqual(b0._scaled_mult(cid, sk), sk.total_multiplier(7), places=4)
+        self.assertAlmostEqual(b0._scaled_mult(cid, sk),
+                               sk.total_multiplier(b0.sc.skill_level), places=4)
 
 
 class TestEquipment(unittest.TestCase):
