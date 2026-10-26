@@ -1,19 +1,22 @@
-# 图标资产（icon_raw.jpg）
+# 图标资产（icon_raw.png）
 
-这个图标是**生图 AI 出的新美术资产**，不是从游戏里抠的、也不依赖运行时抓取。
+图标是**埃特拉的 Q 版大头**，圆形、无文字，随包内置（不依赖运行时抓取）。
 
-- 生成方式：Pollinations（`model=turbo`），2026-10-26
-- 提示词：
-  > super chibi big head sticker, cute girl, short white hair, huge blue eyes,
-  > white construction helmet with a small yellow triangle on the front,
-  > thick clean outline, flat anime colors, centered head, plain light gray
-  > background, no text
-- 种子：`202`（`helmet_2.jpg`）
-- 后处理：`tools/make_icon.py` —— 去浅灰背景、圆形裁切、纸底色圆盘、1px 墨环，
-  输出 512 PNG 与多尺寸 ICO。原图右下角带生成服务水印，裁切时已排除。
+- 来源：游戏内官方 Q 版干员头像（wiki.gg `Estella_icon.png`，120×120）
+- `tools/make_icon.py`：居中裁切 → 放大 + 轻锐化 → 纸底圆盘 + 1px 墨环，
+  输出 512 PNG 与多尺寸 ICO（16~256）
 
-想换风格/换人：重新生成一张 768×768 的 Q 版大头（浅色纯背景、头部居中），
-覆盖 `icon_raw.jpg` 后运行 `python tools/make_icon.py` 即可。
+## 为什么不用生图 AI
 
-注意：生图模型的输出许可与商用条款请以所用服务为准；本仓库仅把它当作
-粉丝工具的图标使用。
+尝试过 Pollinations 的 `turbo` / `flux` / `kontext`（含参考图）多次：
+要么丢掉猫耳头盔，要么把黄色三角画成一块金点，要么变成 3D 玩具娃娃 ——
+和埃特拉对不上（猫耳头盔 + 黄三角 + 右脸创可贴 + 黑色颈圈这几个特征缺一不可）。
+免费生图模型对"特定角色 + 特定装备"没有可控性，所以最终用游戏内的 Q 版头像
+作为内置资产，保证一眼能认出是谁。
+
+## 想换图标
+
+- 换干员：把对应的 120px 头像放到 `icon_raw.png`，跑一次
+  `python tools/make_icon.py`；
+- 换风格：替换 `icon_raw.png` 为任意正方形头像/插画（建议 512 以上），脚本会
+  自动圆形裁切并加纸底与墨环。
