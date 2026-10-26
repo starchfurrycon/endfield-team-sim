@@ -147,6 +147,7 @@ class Battle:
         self.mod = self._build_mods()
         self._apply_equipment()
         self.log: list[dict] = []
+        self.samples: list[dict] = []   # (frame, sp, energy) 水位采样
         self.issues: list[str] = []
         self.counters: dict[str, int] = {}
 
@@ -250,6 +251,9 @@ class Battle:
             self._regen(self.t, frame)
             self.t = max(self.t, frame)
             self._enemy_attacks_between(self.t, frame + 1)
+            if len(self.samples) < 4000:
+                self.samples.append({"f": self.t, "sp": round(self.sp, 1),
+                                     "e": {c: round(v, 1) for c, v in self.energy.items()}})
             if nxt_hit is not None and nxt_hit <= frame:
                 item = self.pending.pop(0)
                 item["frame"] = max(frame, self.t)
@@ -900,5 +904,6 @@ class Battle:
             stats={"cast_counts": dict(self.counters),
                    "sp_left": round(self.sp, 1),
                    "energy_left": {c: round(v, 1) for c, v in self.energy.items()},
-                   "reactions": self.rx.to_dict()},
+                   "reactions": self.rx.to_dict(),
+                   "samples": self.samples[-1500:]},
         )
