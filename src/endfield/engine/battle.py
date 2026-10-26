@@ -41,6 +41,8 @@ class Scenario:
     enemy_poise: float = 100.0
     enemy_hp: float = 1e12
     attack_interval_frames: int = 240
+    # 敌人节奏模板：slow/normal/fast/burst（对应出手间隔 12/8/5/4 秒）
+    enemy_profile: str = "normal"
     start_energy: str = "cold"          # cold | hot
     weapon_atk: float = 0.0        # 额外的武器 ATK（覆盖用）
     weapon_level: int = 90          # 默认武器等级（满级）
@@ -99,7 +101,10 @@ class Result:
 
 # ---------------------------------------------------------------- 战斗
 
-MAX_COMMIT_FRAMES = 120     # 单动作承诺帧上限（4s），用于兜底数据异常
+MAX_COMMIT_FRAMES = 120
+
+# 敌人出手节奏模板（帧）。normal=8s 与 Wiki/实战常见节奏一致。
+ENEMY_PROFILES = {"slow": 360, "normal": 240, "fast": 150, "burst": 120}     # 单动作承诺帧上限（4s），用于兜底数据异常
 
 
 class Battle:
@@ -132,7 +137,9 @@ class Battle:
         self.main: str = sc.main or self.ids[0]
         self.enemy_poise: float = sc.enemy_poise
         self.staggered_until: int = -1
-        self.next_enemy_attack: int = sc.attack_interval_frames
+        interval = ENEMY_PROFILES.get(sc.enemy_profile,
+                                      sc.attack_interval_frames)
+        self.next_enemy_attack: int = interval
         self.total_damage: float = 0.0
         self.per_op: dict[str, float] = {c: 0.0 for c in self.ids}
         self.pending: list[dict] = []
