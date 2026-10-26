@@ -1,6 +1,6 @@
 {
   "name": "endfield-team-sim-desktop",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "private": true,
   "description": "终末地配队模拟 · 桌面壳（Electron）",
   "main": "main.js",

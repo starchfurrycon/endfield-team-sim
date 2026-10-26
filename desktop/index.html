@@ -24,6 +24,9 @@
   input,select{background:var(--panel2);border:1px solid var(--line);color:var(--fg);
     padding:5px 8px;border-radius:6px;font-size:13px;min-width:0}
   input[type=text]{width:100%}
+  input[type=number]{-moz-appearance:textfield;text-align:center;padding:4px 2px}
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
   button{background:var(--acc);color:#04121f;border:0;border-radius:6px;
          padding:6px 10px;font-weight:600;cursor:pointer;font-size:13px}
   button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
@@ -153,20 +156,22 @@
   <aside id="side">
     <div class="row"><input id="q" type="text" placeholder="搜索" /></div>
     <div class="elems" id="elems"></div>
-    <div class="row" style="flex-wrap:wrap">
+    <div class="row">
       <span class="muted">窗口</span>
-      <input id="dur" type="number" value="40" style="width:46px" title="窗口（秒）"/>
-      <select id="eprofile" title="敌人出手节奏">
+      <input id="dur" type="number" value="40" style="width:38px" title="窗口（秒）"/>
+      <select id="eprofile" title="敌人出手节奏" style="padding:4px 4px">
         <option value="normal">敌 8s</option>
         <option value="slow">敌 12s</option>
         <option value="fast">敌 5s</option>
         <option value="burst">敌 4s</option>
       </select>
       <span class="muted">Top</span>
-      <input id="top" type="number" value="3" style="width:36px" title="Top N"/>
-      <button id="clr" class="ghost" title="清空" style="padding:4px 8px">✕</button>
+      <input id="top" type="number" value="3" style="width:30px" title="Top N"/>
     </div>
-    <div class="row"><button id="go" style="flex:1">推荐</button></div>
+    <div class="row">
+      <button id="go" style="flex:1">推荐</button>
+      <button id="clr" class="ghost" title="清空" style="padding:5px 9px">✕</button>
+    </div>
     <div id="ops"></div>
   </aside>
 
