@@ -96,6 +96,7 @@ button:disabled{opacity:.4;cursor:default;transform:none;box-shadow:none}
           text-transform:uppercase}
 .sec .zh{font-size:11px;color:var(--ink2)}
 .sec .cnt{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink3)}
+.main-sec{margin:0 0 14px;padding-top:2px}
 /* ---------- 元素过滤 ---------- */
 .elems{display:flex;gap:7px;margin:9px 0 4px;align-items:center}
 .chip-btn{width:13px;height:13px;border:1px solid var(--ink);background:var(--panel);
@@ -327,6 +328,12 @@ td{font-family:var(--mono);font-size:10.5px}
   </aside>
 
   <section id="main">
+    <div class="sec main-sec">
+      <span class="idx">02</span>
+      <span class="lat">RECOMMENDATIONS</span>
+      <span class="zh">推荐方案</span>
+      <span class="cnt" id="rec-count"></span>
+    </div>
     <div id="result">选人 → 推荐</div>
     <div class="foot" id="foot"></div>
   </section>
@@ -551,6 +558,8 @@ async function runTeam(){
 
 function renderTeams(data){
   const box = $('#result'); box.className = 'cards'; box.innerHTML = '';
+  const cnt = $('#rec-count');
+  if(cnt) cnt.textContent = (data.top ? data.top.length : 0) + ' SQUADS';
   const foot = $('#foot');
   if(foot && META){
     foot.innerHTML = '<span>SUIXINPEI // ' + (META.count || 0) + ' OPERATORS</span>'
