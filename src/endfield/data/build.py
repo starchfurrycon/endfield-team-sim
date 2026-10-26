@@ -518,6 +518,40 @@ def build(force: bool = False, verbose: bool = True) -> dict:
         if verbose:
             print(f"[build] 装备索引跳过：{type(e).__name__}")
 
+    # ---- 武器索引（供推荐层枚举）
+    try:
+        WLEVELS = (9, 9, 4)
+        w_index = {}
+        for wid, w in weapons.items():
+            curve = (weapon_curves.get(w.get("levelTemplateId") or "") or {}).get("list") or []
+            bb: dict[str, float] = {}
+            k = 0
+            for wsid in (w.get("weaponSkillList") or []):
+                if not (wsid.startswith("wpn_attr_") or wsid.startswith("wpn_sp_attr_")):
+                    continue
+                cap = WLEVELS[min(k, 2)]
+                k += 1
+                for row in (patches.get(wsid) or {}).get("SkillPatchDataBundle") or []:
+                    if int(row.get("level") or 1) != cap:
+                        continue
+                    for x in row.get("blackboard") or []:
+                        v = float(x.get("value") or 0.0)
+                        if v:
+                            bb[x["key"]] = bb.get(x["key"], 0.0) + v
+            w_index[wid] = {
+                "rarity": w.get("rarity"),
+                "weapon_type": w.get("weaponType"),
+                "atk_by_level": [int(x.get("baseAtk") or 0) for x in curve],
+                "passive_bb": bb,
+            }
+        (config.NORM / "weapons.json").write_text(
+            json.dumps(w_index, ensure_ascii=False), encoding="utf-8")
+        if verbose:
+            print(f"[build] 武器索引 {len(w_index)} 把")
+    except Exception as e:  # noqa: BLE001
+        if verbose:
+            print(f"[build] 武器索引跳过：{type(e).__name__}")
+
     manifest = {
         "version": version,
         "built_at": dataset["created_at"],

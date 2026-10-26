@@ -262,6 +262,46 @@ def cmd_mechanics(args) -> int:
     print(f"[mechanics] 报告写入 {p}")
     return 0
 
+
+
+def cmd_loadout(args) -> int:
+    from .search import loadout
+    ds = _load_dataset()
+    if ds is None:
+        return 1
+    ids = []
+    for n in args.team.split(","):
+        op = ds.resolve(n.strip())
+        if op is None:
+            print(f"[warn] 未知干员：{n}")
+            continue
+        ids.append(op.char_id)
+    if not ids:
+        return 2
+    rec = loadout.recommend_for_team(ds, ids, args.weapons, args.sets)
+    lines = ["# 装备与武器推荐", ""]
+    for cid, row in rec.items():
+        lines.append(f"## {row['name']}")
+        lines.append("")
+        lines.append("| 推荐武器 | 稀有度 | ATK | ATK% | 主属性 | 等效ATK |")
+        lines.append("|---|---|---|---|---|---|")
+        for w in row["weapons"]:
+            lines.append(f"| `{w['weapon_id']}` | {w['rarity']}★ | {w['atk']:.0f} | "
+                         f"{w['atk_pct']:.0%} | +{w['mainattr']:.0f} | {w['score']:.0f} |")
+        lines.append("")
+        for s in row["equipment"]:
+            lines.append(f"- **{s['label']}**（精锻 {s['enhance_level']}）："
+                         + "、".join(f"`{x}`" for x in s["pieces"]))
+        lines.append("")
+    text = "\n".join(lines)
+    if args.out:
+        from pathlib import Path
+        Path(args.out).write_text(text, encoding="utf-8")
+        print(f"[loadout] 写入 {args.out}")
+    else:
+        print(text)
+    return 0
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="endfield", description="终末地配队模拟")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -319,6 +359,13 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("mechanics", help="从数据表导出机制原文与数值")
     p.set_defaults(func=cmd_mechanics)
+
+    p = sub.add_parser("loadout", help="推荐武器与两套装备")
+    p.add_argument("--team", required=True)
+    p.add_argument("--weapons", type=int, default=3)
+    p.add_argument("--sets", type=int, default=2)
+    p.add_argument("--out", default=None)
+    p.set_defaults(func=cmd_loadout)
 
     p = sub.add_parser("serve", help="启动本地 UI（浏览器/桌面壳）")
     p.add_argument("--port", type=int, default=8777)
