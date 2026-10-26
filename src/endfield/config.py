@@ -65,6 +65,7 @@ TABLES = [
     "PotentialTalentEffectTable.json",
     "EquipTable.json",
     "EquipSuitTable.json",
+    "ItemTable.json",
 ]
 
 # 数据 schema 版本：字段结构变化时 +1，强制重建缓存

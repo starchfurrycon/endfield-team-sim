@@ -70,7 +70,8 @@ def recommend_weapons(ds: Dataset, cid: str, top: int = 3,
         atk_pct = float(bb.get("atk") or 0.0)
         main = float(bb.get("mainattr") or 0.0)
         eff = atk * (1.0 + atk_pct) + main * 0.005 * char_atk
-        out.append({"weapon_id": wid, "rarity": w.get("rarity"),
+        out.append({"weapon_id": wid, "name": w.get("name") or wid,
+                    "rarity": w.get("rarity"),
                     "atk": atk, "atk_pct": round(atk_pct, 4),
                     "mainattr": main, "score": round(eff, 1)})
     out.sort(key=lambda x: (-x["score"], -(x["rarity"] or 0)))
@@ -133,9 +134,11 @@ def recommend_equipment(ds: Dataset, cid: str, top: int = 2,
             if len(chosen) == 4:
                 break
         used.update(chosen)
+        names = [(items.get(iid) or {}).get("name") or iid for iid in chosen]
         sets.append({
             "mode": mode, "label": label,
             "pieces": chosen,
+            "piece_names": names,
             "score": round(sum(s for s, _ in ranked[:4]), 1),
             "enhance_level": level,
         })
@@ -157,3 +160,35 @@ def recommend_for_team(ds: Dataset, team: list[str], top_weapons: int = 3,
             "equipment": recommend_equipment(ds, cid, top=top_sets),
         }
     return out
+
+
+def apply_presets(ds: Dataset, sc, equip: str = "none", weapon: int = 0,
+                  equip_level: int = 3) -> list[str]:
+    """把「装备/武器预设」落到 Scenario（原地修改），返回人类可读的说明。
+
+    没有预设时什么都不做 —— 保持"默认空装备、默认武器"的旧行为。
+    """
+    notes: list[str] = []
+    equip = (equip or "none").strip()
+    if equip in ("output", "sustain"):
+        lv = max(0, min(int(equip_level), 3))
+        sc.equip_level = lv
+        got = 0
+        for cid in sc.team:
+            for row in recommend_equipment(ds, cid, top=2):
+                if row.get("mode") == equip:
+                    sc.equip_by_op[cid] = list(row.get("pieces") or [])
+                    got += 1
+                    break
+        label = "输出向" if equip == "output" else "功能向"
+        notes.append(f"{label}套装（精锻 {lv}）×{got} 人")
+    wi = int(weapon or 0)
+    if wi > 0:
+        picked = 0
+        for cid in sc.team:
+            rows = recommend_weapons(ds, cid, top=max(wi, 3))
+            if len(rows) >= wi:
+                sc.weapon_by_op[cid] = rows[wi - 1]["weapon_id"]
+                picked += 1
+        notes.append(f"推荐武器第 {wi} 顺位 ×{picked} 人")
+    return notes

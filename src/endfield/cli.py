@@ -90,6 +90,7 @@ def _load_dataset():
 def cmd_axis(args) -> int:
     from .engine.battle import Scenario
     from .report import explain
+    from .search import loadout as lo
     from .search.rotations import search_rotation
 
     ds = _load_dataset()
@@ -113,8 +114,12 @@ def cmd_axis(args) -> int:
             continue
         sc = Scenario(team=ids, start_energy=mode, duration_s=args.duration,
                       level=args.level, skill_level=args.skill_level)
+        notes = lo.apply_presets(ds, sc, equip=args.equip,
+                                 weapon=args.weapon, equip_level=args.equip_level)
         rr = search_rotation(ds, sc, beam=args.beam, steps=args.steps,
                              verbose=args.verbose)
+        if notes:
+            print(f"[{label}] 预设：{' · '.join(notes)}")
         print(f"[{label}] 伤害 {rr.result.total_damage:,.0f} / DPS {rr.result.dps:,.0f}"
               f" / 合法 {rr.result.legality_ok}")
         print("   " + explain.explain_rotation(rr.result, ds))
@@ -248,10 +253,9 @@ def cmd_check(args) -> int:
 
 def cmd_serve(args) -> int:
     from .web import server
-    if not (config.NORM / "dataset.json").exists():
-        print("[error] 没有数据集，先运行：python run.py build")
-        return 1
-    server.serve(port=args.port, open_browser=not args.no_browser)
+    # 首启没有数据集时不再直接退出：后台构建，页面显示进度
+    server.serve(port=args.port, open_browser=not args.no_browser,
+                 auto_build=True)
     return 0
 
 
@@ -330,8 +334,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--team", required=True, help="逗号分隔，2~4 人")
     p.add_argument("--mode", choices=["cold", "hot", "both"], default="both")
     p.add_argument("--duration", type=float, default=60.0)
-    p.add_argument("--level", type=int, default=80)
-    p.add_argument("--skill-level", type=int, default=7)
+    p.add_argument("--level", type=int, default=90)
+    p.add_argument("--skill-level", type=int, default=12)
+    p.add_argument("--equip", choices=["none", "output", "sustain"],
+                   default="none", help="装备预设（默认不穿）")
+    p.add_argument("--equip-level", type=int, default=3, help="精锻等级 0~3")
+    p.add_argument("--weapon", type=int, default=0,
+                   help="武器预设：0=默认，1~3=推荐顺位")
     p.add_argument("--beam", type=int, default=3)
     p.add_argument("--steps", type=int, default=26)
     p.add_argument("--out", default=None)
@@ -347,8 +356,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--top", type=int, default=5)
     p.add_argument("--evaluate", type=int, default=12)
     p.add_argument("--duration", type=float, default=60.0)
-    p.add_argument("--level", type=int, default=80)
-    p.add_argument("--skill-level", type=int, default=7)
+    p.add_argument("--level", type=int, default=90)
+    p.add_argument("--skill-level", type=int, default=12)
     p.add_argument("--out", default=None)
     p.add_argument("--json", default=None)
     p.set_defaults(func=cmd_team)

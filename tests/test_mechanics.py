@@ -185,10 +185,18 @@ class TestTalentPotential(unittest.TestCase):
         self.assertGreater(b5._atk(cid), b0._atk(cid))
 
     def test_potential_adds_dmg_bonus(self):
+        """潜能 2 的「物理伤害 +8%」按属性口径进**元素**乘区，不是通用增伤。
+
+        属性 id 50 = 物理伤害加成（AttributeMetaTable.iconName =
+        icon_physical_damage_increase）。此前它被当成通用 dmg_bonus，
+        会让装备/潜能对全部伤害生效，属于过量建模。
+        """
         cid = self.op.char_id
         b0 = Battle(self.ds, Scenario(team=[cid], potential_level=0))
         b5 = Battle(self.ds, Scenario(team=[cid], potential_level=5))
-        self.assertGreater(b5.mod[cid]["dmg_bonus"], b0.mod[cid]["dmg_bonus"])
+        self.assertGreater(b5.mod[cid]["dmg_element"].get("物理", 0.0),
+                           b0.mod[cid]["dmg_element"].get("物理", 0.0))
+        self.assertEqual(b5.mod[cid]["dmg_bonus"], b0.mod[cid]["dmg_bonus"])
 
     def test_conditional_entries_skipped(self):
         for cid, m in Battle(self.ds, Scenario(

@@ -51,8 +51,12 @@ class Scenario:
     # 主控以外的干员会自动普攻（游戏内教学页 wiki_tut_bat_team_1）
     offfield_auto_attack: bool = True
     potential_level: int = 0      # 潜能等级 0~5（默认不点）
-    equip_ids: list[str] = field(default_factory=list)   # 4 件装备（默认空）
+    equip_ids: list[str] = field(default_factory=list)   # 4 件装备（全队同一套，默认空）
     equip_level: int = 3          # 精锻等级 0~3
+    # 每角色 4 件装备：优先于 equip_ids（推荐给装是按人分工的，不能全队同一套）
+    equip_by_op: dict[str, list[str]] = field(default_factory=dict)
+    # 每角色武器覆盖（默认用数据里的默认武器）；用于"换武器对比"
+    weapon_by_op: dict[str, str] = field(default_factory=dict)
     weapon_skill_level: int = 9   # 武器技能等级 1~9（被动属性）
     talent_level: int = 3         # 天赋阶段（取数据里可用的最高阶）
 
@@ -139,7 +143,9 @@ class Battle:
         self.staggered_until: int = -1
         interval = ENEMY_PROFILES.get(sc.enemy_profile,
                                       sc.attack_interval_frames)
-        self.next_enemy_attack: int = interval
+        # 节奏模板必须对**后续每一次**出手都生效，不能只影响第一次
+        self.enemy_interval: int = int(interval)
+        self.next_enemy_attack: int = self.enemy_interval
         self.total_damage: float = 0.0
         self.per_op: dict[str, float] = {c: 0.0 for c in self.ids}
         self.pending: list[dict] = []
@@ -159,6 +165,10 @@ class Battle:
                                            sc.skill_level - 1)].ult_cost or 0.0)
             self.energy[cid] = cap if sc.start_energy == "hot" else 0.0
 
+        # 水位起点（UI 曲线从 0 帧开始）
+        self.samples.append({"f": 0, "sp": round(self.sp, 1),
+                             "e": {c: round(v, 1) for c, v in self.energy.items()}})
+
     # ------------------------------------------------------------ 工具
 
     def _skill(self, cid: str, slot: str):
@@ -175,6 +185,36 @@ class Battle:
         lv = min(len(ult.levels), max(1, self.sc.skill_level)) - 1
         return float(ult.levels[lv].ult_cost or 100.0)
 
+    # ---- 武器：默认取干员数据里的默认武器；weapon_by_op 可逐人换武器
+    _WEAPON_CACHE: dict | None = None
+
+    @classmethod
+    def _weapon_table(cls) -> dict:
+        if Battle._WEAPON_CACHE is None:
+            p = config.NORM / "weapons.json"
+            try:
+                Battle._WEAPON_CACHE = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                Battle._WEAPON_CACHE = {}
+        return Battle._WEAPON_CACHE
+
+    def _weapon_row(self, cid: str) -> dict:
+        """当前生效的武器数据行（atk_by_level / skill_bb）。
+
+        `weapon_by_op` 里的武器来自 weapons.json（被动是 9 级满基质口径），
+        没有覆盖时用干员自带的默认武器，行为与之前完全一致。
+        """
+        wid = (self.sc.weapon_by_op or {}).get(cid)
+        if wid:
+            w = self._weapon_table().get(wid)
+            if w:
+                return {"id": wid,
+                        "atk_by_level": w.get("atk_by_level") or [],
+                        "skill_bb": [w.get("passive_bb") or {}],
+                        "rarity": w.get("rarity"),
+                        "name": w.get("name")}
+        return self.ops[cid].weapon or {}
+
     def _atk(self, cid: str) -> float:
         op = self.ops[cid]
         row = op.stat_at(self.sc.level)
@@ -186,7 +226,7 @@ class Battle:
                         "wisd" if op.sub_attr == "智识" else "will", 0)
         w_atk = self.sc.weapon_atk
         if not w_atk:
-            curve = (op.weapon or {}).get("atk_by_level") or []
+            curve = (self._weapon_row(cid).get("atk_by_level") or [])
             if curve:
                 idx = max(0, min(int(self.sc.weapon_level), len(curve)) - 1)
                 w_atk = float(curve[idx])
@@ -211,6 +251,7 @@ class Battle:
                     sub_v = (sub_v or 0) + extra[k] if op.sub_attr == "意志" else sub_v
         base = dmgmod.effective_atk(row.get("atk", 0.0), main_v or 0, sub_v or 0,
                                     w_atk)
+        base += float((self.mod.get(cid) or {}).get("atk_flat", 0.0))
         return base * (1.0 + float((self.mod.get(cid) or {}).get("atk_pct", 0.0)))
 
     def _lv_index(self, sk) -> int:
@@ -249,8 +290,9 @@ class Battle:
                 break
             frame = min(cands)
             self._regen(self.t, frame)
-            self.t = max(self.t, frame)
+            # 敌人出手必须按"旧时间 → 新时间"结算，否则跨事件的出手会被跳过
             self._enemy_attacks_between(self.t, frame + 1)
+            self.t = max(self.t, frame)
             if len(self.samples) < 4000:
                 self.samples.append({"f": self.t, "sp": round(self.sp, 1),
                                      "e": {c: round(v, 1) for c, v in self.energy.items()}})
@@ -323,7 +365,7 @@ class Battle:
                 self.log.append({"frame": frame, "kind": "enemy_attack",
                                  "op": None, "label": "敌人攻击（主控受击）",
                                  "damage": 0.0})
-            self.next_enemy_attack += self.sc.attack_interval_frames
+            self.next_enemy_attack += self.enemy_interval
 
     def _apply_hit(self, item: dict) -> None:
         cid = item["cid"]
@@ -342,15 +384,18 @@ class Battle:
 
         # ---- 基础伤害在"命中瞬间"计算：抗性/易伤/失衡/导电都随状态变化
         if not item.get("no_rx"):
-            dmg = self._hit_damage(cid, item["mult"], element, frame)
+            dmg = self._hit_damage(cid, item["mult"], element, frame,
+                                   slot=item.get("slot"))
         else:
             dmg = self._hit_damage(cid, item["mult"], element, frame,
-                                   apply_status=False)
+                                   apply_status=False, slot=item.get("slot"))
         if dmg > 0:
             self.total_damage += dmg
             self.per_op[cid] = self.per_op.get(cid, 0.0) + dmg
 
         # ---- 元素 / 物理异常（附加伤害，属于施放者）
+        # 注意：异常伤害只按 ATK / 等级 / AI / 失衡算，不再叠元素伤害词条——
+        # 词条口径本身不明确（是否作用于异常），宁可低估不错算。
         if item.get("no_rx"):
             return
         atk = self._atk(cid)
@@ -408,8 +453,61 @@ class Battle:
     # ------------------------------------------------------------ 天赋/潜能
 
     _ATTR_MAIN = {39: "str", 40: "agi", 41: "wisd", 42: "will"}
-    _ATTR_DMG = {17, 28, 29, 32, 33, 50, 51, 52, 53, 54, 55, 61,
-                 64, 65, 66, 67, 68, 69}
+    # 属性 id → 生效范围（来源：AttributeMetaTable 的 iconName 字段）
+    #   17 普攻效率 / 32 战技效率 / 33 连携技效率 / 28 终结技效率
+    #   50~55 元素伤害加成（物理/灼热/电磁/寒冷/自然/超域）
+    #   61 对失衡单位伤害提升；29 治疗输出（不参与伤害）；64~69 无图标，未定性
+    _ATTR_SLOT = {17: ("normal_attack", "power_attack", "dash_attack"),
+                  32: ("battle_skill",), 33: ("combo_skill",), 28: ("ultimate",)}
+    _ATTR_ELEMENT = {50: "物理", 51: "灼热", 52: "电磁",
+                     53: "寒冷", 54: "自然", 55: "超域"}
+
+    def _new_mod(self) -> dict:
+        return {"attrs": {}, "atk_flat": 0.0, "atk_pct": 0.0,
+                "dmg_bonus": 0.0,          # 通用伤害加成（套装黑板等）
+                "dmg_slot": {},           # 按技能槽位的效率加成
+                "dmg_element": {},        # 按元素（伤害类型）的加成
+                "dmg_stagger": 0.0,       # 对失衡单位的伤害加成
+                "heal_bonus": 0.0,        # 治疗量加成（不参与伤害）
+                "ai": 0.0, "bb": [], "applied": [], "ignored_attrs": []}
+
+    def _add_mod_attr(self, m: dict, a, v: float, tag: str) -> None:
+        """按属性 id 把数值放进对应的乘区（不再一律塞进通用伤害加成）。"""
+        try:
+            a = int(a)
+        except (TypeError, ValueError):
+            return
+        if not v:
+            return
+        if a in self._ATTR_MAIN:
+            k = self._ATTR_MAIN[a]
+            m["attrs"][k] = m["attrs"].get(k, 0.0) + v
+            m["applied"].append(f"{tag}:{k}+{v:g}")
+        elif a == 87:
+            m["ai"] += v
+            m["applied"].append(f"{tag}:AI+{v:g}")
+        elif a == 2:                       # 攻击力（固定值）
+            m["atk_flat"] += v
+            m["applied"].append(f"{tag}:ATK+{v:g}")
+        elif a in self._ATTR_SLOT:
+            for slot in self._ATTR_SLOT[a]:
+                m["dmg_slot"][slot] = m["dmg_slot"].get(slot, 0.0) + v
+            m["applied"].append(f"{tag}:{self._ATTR_SLOT[a][0]}+{v:.1%}")
+        elif a in self._ATTR_ELEMENT:
+            el = self._ATTR_ELEMENT[a]
+            m["dmg_element"][el] = m["dmg_element"].get(el, 0.0) + v
+            m["applied"].append(f"{tag}:{el}+{v:.1%}")
+        elif a == 61:
+            m["dmg_stagger"] += v
+            m["applied"].append(f"{tag}:失衡+{v:.1%}")
+        elif a == 29:
+            m["heal_bonus"] += v
+        elif a in (1, 3, 4, 5, 6, 7, 44, 48, 60):
+            # 生命/防御/受击减免/能量获取效率：不参与伤害公式（也不做生存模拟）
+            return
+        else:
+            # 64~69 等未定性属性：宁可不用，也不当成通用增伤
+            m["ignored_attrs"].append(a)
 
 
     _EQUIP_CACHE: dict | None = None
@@ -424,14 +522,8 @@ class Battle:
                 Battle._EQUIP_CACHE = {"items": {}, "suits": {}}
         return Battle._EQUIP_CACHE
 
-    def _apply_equipment(self) -> None:
-        """把 4 件装备的属性（按精锻等级）加到每个干员身上。
-
-        默认 equip_ids 为空 = 不穿装备，行为与之前完全一致。
-        """
-        ids = list(self.sc.equip_ids or [])
-        if not ids:
-            return
+    def _equip_acc(self, ids: list[str]) -> dict[str, float]:
+        """4 件装备的属性累加（按精锻等级），并叠加同套 >= need 件的套装被动。"""
         table = (self._equip_table().get("items") or {})
         lv = max(0, min(int(self.sc.equip_level), 3))
         acc: dict[str, float] = {}
@@ -465,14 +557,34 @@ class Battle:
                     acc["__dmg__"] = acc.get("__dmg__", 0.0) + float(v)
                 elif k in ("agi_up", "str_up", "wisd_up", "will_up"):
                     acc["__attr_" + k[:-3]] = acc.get("__attr_" + k[:-3], 0.0) + float(v)
+        return acc
 
-        if not acc:
+    def _apply_equipment(self) -> None:
+        """把装备属性加到干员身上。
+
+        * `equip_by_op`（每角色 4 件）优先，推荐给装是按人分工的；
+        * 其次 `equip_ids`（全队同一套，旧行为）；
+        * 两者都为空 = 不穿装备，行为与之前完全一致。
+        """
+        team_ids = list(self.sc.equip_ids or [])
+        per_op = {k: list(v) for k, v in (self.sc.equip_by_op or {}).items() if v}
+        if not team_ids and not per_op:
             return
+        cache: dict[tuple, dict] = {}
         for cid in self.ids:
+            ids = per_op.get(cid) or team_ids
+            if not ids:
+                continue
+            key = tuple(ids)
+            if key not in cache:
+                cache[key] = self._equip_acc(ids)
+            acc = cache[key]
+            if not acc:
+                continue
             m = self.mod[cid]
             for attr, v in acc.items():
                 if attr == "__atk_pct__":
-                    m["atk_pct"] = m.get("atk_pct", 0.0) + v
+                    m["atk_pct"] += v
                     m["applied"].append(f"SET:atk+{v:.1%}")
                     continue
                 if attr == "__dmg__":
@@ -484,22 +596,9 @@ class Battle:
                     m["attrs"][k2] = m["attrs"].get(k2, 0.0) + v
                     m["applied"].append(f"SET:{k2}+{v:g}")
                     continue
-                try:
-                    a = int(attr)
-                except ValueError:
-                    continue
                 if attr.startswith("__"):
                     continue
-                if a in self._ATTR_MAIN:
-                    k = self._ATTR_MAIN[a]
-                    m["attrs"][k] = m["attrs"].get(k, 0.0) + v
-                elif a == 87:
-                    m["ai"] += v
-                elif a in self._ATTR_DMG:
-                    m["dmg_bonus"] += v
-                else:
-                    continue
-                m["applied"].append(f"EQ:{attr}+{v:g}")
+                self._add_mod_attr(m, attr, v, "EQ")
 
     def _build_mods(self) -> dict:
         """把天赋/潜能里**无条件**的数值修正整理成 {cid: {...}}。
@@ -511,14 +610,9 @@ class Battle:
         for cid in self.ids:
             op = self.ops[cid]
             mods = op.mods or {}
-            attrs: dict[str, float] = {}
-            dmg = 0.0
-            ai = 0.0
-            bb: list[dict] = []
-            applied: list[str] = []
+            m = self._new_mod()
 
             def take(entries, tag):
-                nonlocal dmg, ai
                 for e in entries or []:
                     if e.get("conditional"):
                         continue
@@ -526,23 +620,14 @@ class Battle:
                         k = str(e.get("key") or "")
                         v = float(e.get("value") or 1.0)
                         if k and v and v != 1.0:
-                            bb.append({"key": k, "value": v,
-                                       "skill_id": e.get("skill_id") or ""})
-                            applied.append(f"{tag}:{k}×{v:g}")
+                            m["bb"].append({"key": k, "value": v,
+                                            "skill_id": e.get("skill_id") or ""})
+                            m["applied"].append(f"{tag}:{k}×{v:g}")
                         continue
                     if e.get("kind") != "attr":
                         continue
-                    a = e.get("attr"); v = float(e.get("value") or 0)
-                    if a in self._ATTR_MAIN:
-                        k = self._ATTR_MAIN[a]
-                        attrs[k] = attrs.get(k, 0.0) + v
-                        applied.append(f"{tag}:{k}+{v:g}")
-                    elif a == 87:
-                        ai += v
-                        applied.append(f"{tag}:AI+{v:g}")
-                    elif a in self._ATTR_DMG:
-                        dmg += v
-                        applied.append(f"{tag}:DMG+{v:.1%}")
+                    self._add_mod_attr(m, e.get("attr"),
+                                       float(e.get("value") or 0), tag)
 
             for tal, levels in (mods.get("talents") or {}).items():
                 if not levels:
@@ -553,23 +638,21 @@ class Battle:
                 take((mods.get("potentials") or {}).get(str(k)), f"P{k}")
 
             # 武器被动：wpn_attr_*（属性）/ wpn_sp_attr_*（atk% 等）
-            wbb = op.weapon.get("skill_bb") or []
+            wbb = self._weapon_row(cid).get("skill_bb") or []
             if wbb:
-                atk_pct = 0.0
                 for k, v in (wbb[0] or {}).items():
                     if k in ("str", "agi", "wisd", "will"):
-                        attrs[k] = attrs.get(k, 0.0) + float(v)
-                        applied.append(f"W:{k}+{v:g}")
+                        m["attrs"][k] = m["attrs"].get(k, 0.0) + float(v)
+                        m["applied"].append(f"W:{k}+{v:g}")
                     elif k == "atk":
-                        atk_pct += float(v)
-                        applied.append(f"W:atk+{float(v):.1%}")
+                        m["atk_pct"] += float(v)
+                        m["applied"].append(f"W:atk+{float(v):.1%}")
                     elif k == "mainattr":
-                        attrs["__mainattr__"] = attrs.get("__mainattr__", 0.0) + float(v)
-                        applied.append(f"W:mainattr+{float(v):g}")
+                        m["attrs"]["__mainattr__"] = (
+                            m["attrs"].get("__mainattr__", 0.0) + float(v))
+                        m["applied"].append(f"W:mainattr+{float(v):g}")
 
-            out[cid] = {"attrs": attrs, "dmg_bonus": dmg, "ai": ai,
-                        "bb": bb, "atk_pct": atk_pct if wbb else 0.0,
-                        "applied": applied}
+            out[cid] = m
         return out
 
 
@@ -628,19 +711,27 @@ class Battle:
                 + float((self.mod.get(cid) or {}).get("ai", 0.0)))
 
     def _hit_damage(self, cid: str, mult: float, element: str | None,
-                    frame: int, *, apply_status: bool = True) -> float:
+                    frame: int, *, apply_status: bool = True,
+                    slot: str | None = None) -> float:
         if mult <= 0:
             return 0.0
+        m = self.mod.get(cid) or {}
         atk = self._atk(cid)
         res = self.sc.enemy_res
         if apply_status:
             res = max(0.0, res - self.rx.res_shred(frame) / 100.0)
         d = atk * mult
-        d *= 1.0 + float((self.mod.get(cid) or {}).get("dmg_bonus", 0.0))
+        d *= 1.0 + float(m.get("dmg_bonus", 0.0))
+        # 按技能槽位 / 元素 / 失衡的专项加成（AttributeMetaTable 的口径）
+        if slot:
+            d *= 1.0 + float((m.get("dmg_slot") or {}).get(slot, 0.0))
+        if element:
+            d *= 1.0 + float((m.get("dmg_element") or {}).get(element, 0.0))
         d *= 100.0 / (max(0.0, self.sc.enemy_def) + 100.0)
         d *= max(0.0, 1.0 - res)
         if self.staggered_until > frame:
-            d *= config.guess("STAGGER_DMG_MULT")
+            d *= config.guess("STAGGER_DMG_MULT") * (
+                1.0 + float(m.get("dmg_stagger", 0.0)))
         if apply_status and element in rxmod.ARTS_ELEMENTS:
             d *= self.rx.arts_dmg_taken(frame)
         return round(d)
@@ -867,6 +958,7 @@ class Battle:
         b.pending = [dict(x) for x in self.pending]
         b.rx = self.rx.clone()
         b.log = list(self.log)
+        b.samples = [dict(x) for x in self.samples]
         b.issues = list(self.issues)
         b.counters = dict(self.counters)
         return b
@@ -885,11 +977,19 @@ class Battle:
                 f"{self.counters['commit_clamped']} 次动作的承诺帧超过 "
                 f"{MAX_COMMIT_FRAMES} 帧，已钳制（源数据 exclusiveFrame 异常）")
         unmodeled = [
-            "武器/装备加成", "buff/debuff 体系", "元素异常伤害（燃烧/导电/冻结/腐蚀）",
-            "物理异常伤害（击飞/倒地/猛击/碎甲）", "暴击随机性（用期望值）",
-            "敌人受击硬直与实际出手节奏", "连携技的额外条件（如层数、消耗）",
+            "buff/debuff 体系（BuffData 的 attributeModifier 叠加）",
+            "武器条件型技能（sk_wpn_*，如“攻击力+12% 持续 20 秒”）",
+            "暴击随机性（用期望值）",
+            "敌人受击硬直与真实 AI 节奏（固定间隔出手）",
+            "连携技的额外条件（如层数、消耗）",
+            "多段技能的分支判定（if/else 无法区分）",
         ]
         warnings.append("技力恢复速度、切人开销等为 estimate，可在 config.py 校准")
+        # 水位采样：补上结束点，保证 UI 的曲线覆盖整个窗口
+        samples = list(self.samples)
+        if not samples or samples[-1]["f"] != self.t:
+            samples.append({"f": self.t, "sp": round(self.sp, 1),
+                            "e": {c: round(v, 1) for c, v in self.energy.items()}})
         return Result(
             scenario=self.sc.to_dict(),
             total_damage=round(self.total_damage, 1),
@@ -903,7 +1003,12 @@ class Battle:
             legality_issues=list(self.issues),
             stats={"cast_counts": dict(self.counters),
                    "sp_left": round(self.sp, 1),
+                   "sp_max": float(config.guess("SP_MAX")),
                    "energy_left": {c: round(v, 1) for c, v in self.energy.items()},
+                   "energy_cap": {c: round(self._energy_cap(c), 1) for c in self.ids},
+                   "weapons": {c: (self.sc.weapon_by_op or {}).get(c)
+                               or (self.ops[c].weapon or {}).get("id")
+                               for c in self.ids},
                    "reactions": self.rx.to_dict(),
-                   "samples": self.samples[-1500:]},
+                   "samples": samples[-1500:]},
         )

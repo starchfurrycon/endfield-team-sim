@@ -102,8 +102,8 @@ def static_rank(ops: list[Operator], level: int, skill_level: int) -> list[Opera
     return sorted(ops, key=lambda o: _power(o, level, skill_level), reverse=True)
 
 
-def candidate_teams(ds: Dataset, q: TeamQuery, level: int = 80,
-                    skill_level: int = 7) -> tuple[list[list[Operator]], list[str]]:
+def candidate_teams(ds: Dataset, q: TeamQuery, level: int = 90,
+                    skill_level: int = 12) -> tuple[list[list[Operator]], list[str]]:
     pool, missing = pool_of(ds, q)
     must_ids, _ = _resolve(ds, q.must)
     must_ops = [ds.operators[c] for c in must_ids if c in ds.operators]
@@ -124,7 +124,7 @@ def candidate_teams(ds: Dataset, q: TeamQuery, level: int = 80,
 
 
 def evaluate_team(ds: Dataset, team: list[Operator], q: TeamQuery,
-                  level: int = 80, skill_level: int = 7) -> TeamResult | None:
+                  level: int = 90, skill_level: int = 12) -> TeamResult | None:
     ids = [o.char_id for o in team]
     names = [o.name_zh or o.char_id for o in team]
     base = dict(level=level, skill_level=skill_level, duration_s=q.duration_s,
@@ -160,8 +160,8 @@ def _reasons(ds: Dataset, team: list[Operator], cold, hot) -> list[str]:
     return out
 
 
-def recommend(ds: Dataset, q: TeamQuery, level: int = 80,
-              skill_level: int = 7, verbose: bool = True) -> dict:
+def recommend(ds: Dataset, q: TeamQuery, level: int = 90,
+              skill_level: int = 12, verbose: bool = True) -> dict:
     teams, missing = candidate_teams(ds, q, level, skill_level)
     if verbose:
         print(f"[team] 候选队 {len(teams)} 个，评估前 {min(q.evaluate, len(teams))} 个")

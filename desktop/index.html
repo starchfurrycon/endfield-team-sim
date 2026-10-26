@@ -8,6 +8,7 @@
     --bg:#0e1116; --panel:#161b22; --panel2:#1c2230; --line:#2a3140;
     --fg:#e6edf3; --dim:#8b949e; --acc:#4ea1ff; --warn:#ffb454;
     --cold:#4ea1ff; --hot:#ff7a59; --must:#3fb950; --ban:#f85149;
+    --ok:#3fb950; --bad:#f85149;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--fg);
@@ -39,9 +40,11 @@
   .tag{font-size:11px;color:var(--dim)}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
         padding:12px;margin-bottom:12px}
-  .card h3{margin:0 0 8px;font-size:15px;display:flex;gap:10px;align-items:center}
+  .card h3{margin:0 0 8px;font-size:15px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .badge{font-size:11px;padding:2px 6px;border-radius:999px;background:var(--panel2);
          color:var(--dim);border:1px solid var(--line)}
+  .badge.ok{color:var(--ok);border-color:rgba(63,185,80,.5)}
+  .badge.bad{color:var(--bad);border-color:rgba(248,81,73,.5)}
   .kpi{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px}
   .kpi div{font-size:12px;color:var(--dim)}
   .kpi b{display:block;font-size:18px;color:var(--fg)}
@@ -55,7 +58,8 @@
   .bar{position:absolute;top:3px;height:16px;border-radius:3px;
        background:var(--acc);opacity:.85}
   .bar.combo{background:#a371f7} .bar.ultimate{background:#ff7a59}
-  .bar.power_attack{background:#e3b341} .bar.enemy{background:#f85149;opacity:.45}
+  .bar.power_attack{background:#e3b341} .bar.battle_skill{background:#4ea1ff}
+  .bar.enemy{background:#f85149;opacity:.45}
   .hit{position:absolute;top:0;width:2px;height:22px;background:#fff;opacity:.75}
   .ticks{display:grid;grid-template-columns:96px 1fr;gap:8px;color:var(--dim);font-size:11px}
   .ticks .t{position:relative;height:14px;border-top:1px solid var(--line)}
@@ -65,18 +69,71 @@
   th{color:var(--dim);font-weight:500}
   .muted{color:var(--dim);font-size:12px}
   .warn{color:var(--warn)}
-  .tabs{display:flex;gap:6px;margin:8px 0}
+  .tabs{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap}
   .tabs button{padding:5px 10px;font-size:12px}
   .tabs button.on{background:var(--acc)}
   .tabs button.off{background:transparent;border:1px solid var(--line);color:var(--fg)}
   #status{font-size:12px;color:var(--dim)}
+  details{margin-top:8px}
+  summary{cursor:pointer;color:var(--dim);font-size:12px}
+  /* ---- 水位轨 ---- */
+  .wl{margin:10px 0 4px;position:relative}
+  .wl-title{font-size:12px;color:var(--dim);margin:0 0 6px}
+  .wl-body{position:relative}
+  .wl-body .track{height:20px;overflow:hidden}
+  .wl-body .lane{grid-template-columns:96px 1fr 34px}
+  .wl-body svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .wl-cap{font-size:10px;color:var(--dim);text-align:right;line-height:1}
+  .wl-cursor{position:absolute;top:0;bottom:0;width:1px;background:#fff;opacity:.5;
+             display:none;pointer-events:none}
+  .wl-tip{position:absolute;top:-4px;transform:translate(-50%,-100%);background:#0b0f14;
+          border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:11px;
+          color:var(--fg);white-space:nowrap;display:none;pointer-events:none;z-index:5}
+  .wl-legend{font-size:11px;color:var(--dim);margin-top:2px;text-align:right}
+  /* ---- 对比 ---- */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;
+         align-items:flex-start;justify-content:center;padding:24px;z-index:50;overflow:auto}
+  .modal.open{display:flex}
+  .modal-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+              width:min(1180px,100%);padding:14px;position:relative}
+  .modal-card h2{font-size:16px;margin:0 0 6px}
+  .modal-card .close{position:absolute;right:10px;top:8px;background:transparent;
+                     border:0;color:var(--dim);font-size:20px;cursor:pointer;padding:2px 8px}
+  .cmp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0}
+  .cmp-side{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--panel2)}
+  .cmp-side h4{margin:0 0 8px;font-size:13px;display:flex;gap:6px;align-items:center}
+  .cmp-side .field{display:grid;grid-template-columns:52px 1fr;gap:6px;align-items:center;
+                   margin-bottom:6px}
+  .cmp-side select{width:100%}
+  .cmp-out .cmp-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .cmp-col{border:1px solid var(--line);border-radius:8px;padding:10px}
+  .cmp-sum{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin:10px 0;
+           padding:10px;background:var(--panel2);border-radius:8px}
+  .delta.up{color:var(--ok)} .delta.down{color:var(--bad)}
+  .delta b{font-size:20px}
+  /* ---- 首启进度 ---- */
+  #boot{position:fixed;inset:0;background:var(--bg);z-index:100;display:none;
+        align-items:center;justify-content:center;padding:24px}
+  #boot.open{display:flex}
+  .boot-card{width:min(560px,100%);background:var(--panel);border:1px solid var(--line);
+             border-radius:12px;padding:22px}
+  .boot-card h2{font-size:17px;margin:0 0 6px}
+  .boot-card p{color:var(--dim);font-size:13px;margin:6px 0}
+  .bar-outer{height:10px;background:var(--panel2);border-radius:999px;overflow:hidden;
+             border:1px solid var(--line);margin:14px 0 8px}
+  .bar-inner{height:100%;width:0;background:linear-gradient(90deg,#4ea1ff,#3fb950);
+             transition:width .35s ease}
+  .boot-meta{display:flex;justify-content:space-between;font-size:12px;color:var(--dim)}
+  .boot-err{color:var(--bad);font-size:12px;white-space:pre-wrap;margin-top:8px}
 </style>
 </head>
 <body>
+
 <header>
   <h1>终末地配队模拟</h1>
   <span class="ver" id="ver">加载中…</span>
   <span class="muted">点击左侧干员：一次=必须包含，两次=禁止，三次=清除</span>
+  <span id="boot-pill" class="badge" hidden></span>
 </header>
 
 <main>
@@ -113,22 +170,138 @@
   </section>
 </main>
 
+<!-- 首启构建进度 -->
+<div id="boot">
+  <div class="boot-card">
+    <h2 id="boot-title">正在准备数据…</h2>
+    <p id="boot-msg">首次启动会从社区数据仓构建数据集，需要联网，约 1~3 分钟。</p>
+    <div class="bar-outer"><div class="bar-inner" id="boot-bar"></div></div>
+    <div class="boot-meta">
+      <span id="boot-pct">0%</span>
+      <span id="boot-elapsed"></span>
+    </div>
+    <div class="boot-err" id="boot-err" hidden></div>
+    <div style="margin-top:14px;display:flex;gap:8px">
+      <button id="boot-retry" hidden>重试构建</button>
+      <span class="muted" id="boot-hint">构建完成后会自动进入界面，期间不要关闭窗口。</span>
+    </div>
+  </div>
+</div>
+
+<!-- 对比视图 -->
+<div id="cmp" class="modal">
+  <div class="modal-card">
+    <button class="close" id="cmp-close">×</button>
+    <h2>方案对比</h2>
+    <div class="muted" id="cmp-team"></div>
+    <div class="cmp-grid" id="cmp-config"></div>
+    <div class="row">
+      <button id="cmp-run">开始对比</button>
+      <span class="muted" id="cmp-status"></span>
+    </div>
+    <div class="cmp-out" id="cmp-out"></div>
+  </div>
+</div>
+
 <script>
 const $ = (s) => document.querySelector(s);
 const ELEM_COLOR = {物理:'#8b949e',灼热:'#fe623c',电磁:'#ffbe02',寒冷:'#21c5ce',自然:'#9edc23'};
+const OP_COLORS = ['#4ea1ff','#ff7a59','#3fb950','#a371f7','#e3b341'];
+const MODE_LABEL = {cold:'冷启动', hot:'热启动'};
+const ENEMY_LABEL = {slow:'缓慢 12s', normal:'普通 8s', fast:'快速 5s', burst:'爆发 4s'};
 let META = null, STATE = {}, CURRENT = null, MODE = 'cold';
+let LOADOUT = {};            // cid -> 推荐（用于对比视图的武器/装备选项）
 
 function el(tag, cls, txt){ const e=document.createElement(tag); if(cls)e.className=cls;
   if(txt!=null)e.textContent=txt; return e; }
+function fmt(n){ return Math.round(n).toLocaleString(); }
 
-async function boot(){
-  const r = await fetch('/api/meta'); META = await r.json();
+async function jget(url){
+  const r = await fetch(url);
+  const data = await r.json().catch(()=>({error:'返回不是 JSON'}));
+  if(!r.ok && data.error) throw new Error(data.error);
+  return data;
+}
+async function jpost(url, body){
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body||{})});
+  const data = await r.json().catch(()=>({error:'返回不是 JSON'}));
+  if(!r.ok && data.error) throw new Error(data.error);
+  return data;
+}
+
+/* ------------------------------------------------------------ 首启进度 */
+
+function showBoot(st){
+  $('#boot').classList.add('open');
+  $('#boot-pill').hidden = false;
+  updateBoot(st);
+}
+function hideBoot(){
+  $('#boot').classList.remove('open');
+  $('#boot-pill').hidden = true;
+}
+function updateBoot(st){
+  const pct = Math.max(0, Math.min(100, st.percent || 0));
+  $('#boot-bar').style.width = pct + '%';
+  $('#boot-pct').textContent = pct + '%';
+  $('#boot-elapsed').textContent = st.elapsed_s ? ('已用 ' + st.elapsed_s + 's') : '';
+  if(st.message) $('#boot-msg').textContent = st.message;
+  $('#boot-pill').textContent = '构建中 ' + pct + '%';
+  const err = st.state === 'error';
+  $('#boot-err').hidden = !err;
+  $('#boot-retry').hidden = !err;
+  $('#boot-title').textContent = err ? '数据构建失败' : '正在准备数据…';
+  if(err){
+    $('#boot-err').textContent = st.error || '未知错误';
+    $('#boot-hint').textContent = '可以点「重试构建」；也可能是网络不通，稍后再试。';
+    $('#boot-pill').textContent = '构建失败';
+  }
+}
+
+async function waitForData(){
+  const st = await jget('/api/status');
+  if(st.state === 'ready'){ hideBoot(); return true; }
+  showBoot(st);
+  if(st.state === 'idle'){
+    // 只在没有自动构建的场合出现：给用户一个手动入口
+    $('#boot-msg').textContent = '本地还没有数据集。点下面的按钮开始构建（需要联网）。';
+    $('#boot-retry').hidden = false;
+    $('#boot-retry').textContent = '开始构建';
+  }
+  return new Promise((resolve) => {
+    const timer = setInterval(async () => {
+      try{
+        const s2 = await jget('/api/status');
+        updateBoot(s2);
+        if(s2.state === 'ready'){
+          clearInterval(timer);
+          hideBoot();
+          resolve(true);
+        }
+      }catch(e){ /* 服务端重启期间忽略 */ }
+    }, 700);
+  });
+}
+
+$('#boot-retry').onclick = async () => {
+  $('#boot-retry').disabled = true;
+  try{ await jpost('/api/status', {action:'rebuild'}); }
+  catch(e){ $('#boot-err').hidden = false; $('#boot-err').textContent = e.message; }
+  finally{ $('#boot-retry').disabled = false; }
+};
+
+/* ------------------------------------------------------------ 干员列表 */
+
+async function loadMeta(){
+  META = await jget('/api/meta');
   $('#ver').textContent = `数据集 ${META.version} · ${META.count} 名可用干员`;
-  META.operators.forEach(o => STATE[o.id] = 0);   // 0 中性 / 1 必须 / 2 禁止
+  META.operators.forEach(o => { if(!(o.id in STATE)) STATE[o.id] = 0; });
   renderOps();
 }
 
 function renderOps(){
+  if(!META) return;
   const q = ($('#q').value||'').trim().toLowerCase();
   const el0 = $('#felem').value;
   const box = $('#ops'); box.innerHTML='';
@@ -153,11 +326,8 @@ async function runTeam(){
   $('#go').disabled = true; $('#status').textContent = '搜索中…';
   const must = picked(1), ban = picked(2);
   try{
-    const r = await fetch('/api/team', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({must, ban, duration:+$('#dur').value,
-                            top:+$('#top').value, evaluate:+$('#eval').value})});
-    const data = await r.json();
-    if(data.error) throw new Error(data.error);
+    const data = await jpost('/api/team', {must, ban, duration:+$('#dur').value,
+      top:+$('#top').value, evaluate:+$('#eval').value});
     renderTeams(data);
     $('#status').textContent = `评估了 ${data.evaluated} 队`;
   }catch(e){ $('#result').textContent = '出错：'+e.message; }
@@ -170,7 +340,7 @@ function renderTeams(data){
   data.top.forEach((t,i) => {
     const c = el('div','card');
     const h = el('h3'); h.appendChild(el('span',null,`${i+1}. ${t.names.join(' / ')}`));
-    h.appendChild(el('span','badge',`评分 ${Math.round(t.score)}`));
+    h.appendChild(el('span','badge',`评分 ${fmt(t.score)}`));
     c.appendChild(h);
 
     const kpi = el('div','kpi');
@@ -181,17 +351,23 @@ function renderTeams(data){
     const reasons = el('div','muted'); reasons.textContent = t.reason.join(' · '); c.appendChild(reasons);
 
     const tabs = el('div','tabs');
+    const modeBtns = {};
     ['cold','hot'].forEach(m => {
       const b = el('button', MODE===m?'on':'off', m==='cold'?'冷启动轴':'热启动轴');
-      b.onclick = () => { CURRENT = {team:t.team, i:i}; loadAxis(t, m, c); };
+      modeBtns[m] = b;
+      b.onclick = () => { MODE = m; CURRENT = {team:t.team, nameMap:t.name_map};
+        ['cold','hot'].forEach(k => { modeBtns[k].className = (k===m?'on':'off'); });
+        loadAxis(t, m, c); };
       tabs.appendChild(b);
     });
-    c.appendChild(tabs);
     const loBtn = el('button', 'off', '装备/武器推荐');
-    loBtn.style.marginLeft = '6px';
-    loBtn.onclick = () => loadLoadout(t, card);
+    loBtn.onclick = () => loadLoadout(t, c);
     tabs.appendChild(loBtn);
+    const cmpBtn = el('button', 'off', '对比');
+    cmpBtn.onclick = () => openCompare(t);
+    tabs.appendChild(cmpBtn);
 
+    c.appendChild(tabs);
     const holder = el('div'); holder.id = 'axis-'+i; c.appendChild(holder);
     box.appendChild(c);
     if(i===0) loadAxis(t, MODE, c);
@@ -201,33 +377,32 @@ function renderTeams(data){
 function kpiBox(cls,label,dps,dmg){
   const d = el('div',cls);
   d.appendChild(document.createTextNode(label));
-  const b = el('b',null, Math.round(dps).toLocaleString());
-  d.appendChild(b);
-  d.appendChild(document.createTextNode(`总伤 ${Math.round(dmg).toLocaleString()}`));
+  d.appendChild(el('b',null, fmt(dps)));
+  d.appendChild(document.createTextNode(`总伤 ${fmt(dmg)}`));
   return d;
 }
 
 async function loadAxis(t, mode, card){
   const holder = card.querySelector('[id^=axis-]') || el('div');
   holder.innerHTML = '<div class="muted">计算中…</div>';
-  const q = new URLSearchParams({team:t.team.join(','), mode,
-    duration:$('#dur').value, enemy: ($('#eprofile')||{}).value || 'normal'});
-  const r = await fetch('/api/axis?'+q.toString());
-  const data = await r.json();
-  if(data.error){ holder.innerHTML = '<div class="warn">'+data.error+'</div>'; return; }
-  holder.innerHTML = '';
-  holder.appendChild(renderAxis(data.rotation.result, t));
+  try{
+    const q = new URLSearchParams({team:t.team.join(','), mode,
+      duration:$('#dur').value, enemy: ($('#eprofile')||{}).value || 'normal'});
+    const data = await jget('/api/axis?'+q.toString());
+    holder.innerHTML = '';
+    holder.appendChild(renderAxis(data.rotation.result, t, data.config));
+  }catch(e){
+    holder.innerHTML = '';
+    holder.appendChild(el('div','warn','出错：'+e.message));
+  }
 }
 
-function renderAxis(res, t){
-  const wrap = el('div');
-  const dur = res.duration_frames/30;
-  const lanes = {};
-  t.team.forEach(id => lanes[id] = t.name_map[id] || id);
-  const laneBox = el('div');
-  const order = Object.keys(lanes);
+/* ------------------------------------------------------------ 甘特图 */
 
-  function lane(name, events, cls){
+function gantt(res, order, nameMap){
+  const dur = Math.max(1, res.duration_frames)/30;
+  const laneBox = el('div');
+  function lane(name, events){
     const l = el('div','lane');
     l.appendChild(el('div','lb', name));
     const tr = el('div','track');
@@ -236,7 +411,7 @@ function renderAxis(res, t){
       const b = el('div','bar '+(ev.bar||''));
       b.style.left = (s/dur*100)+'%';
       b.style.width = Math.max(0.4,(e-s)/dur*100)+'%';
-      b.title = `${ev.label}  ${s.toFixed(2)}s`;
+      b.title = `${ev.label}  ${s.toFixed(2)}s – ${e.toFixed(2)}s`;
       tr.appendChild(b);
       (ev.hits||[]).forEach(hf => {
         const h = el('div','hit'); h.style.left = ((hf/30)/dur*100)+'%';
@@ -246,28 +421,144 @@ function renderAxis(res, t){
     l.appendChild(tr);
     return l;
   }
-
   order.forEach(id => {
     const evs = (res.timeline||[]).filter(e => e.kind==='cast' && e.op===id)
       .map(e => ({...e, bar: e.slot}));
-    laneBox.appendChild(lane(lanes[id], evs));
+    laneBox.appendChild(lane(nameMap[id] || id, evs));
   });
   const enemy = (res.timeline||[]).filter(e => e.kind==='enemy_attack')
     .map(e => ({frame:e.frame, commit_end:e.frame, label:e.label, bar:'enemy', hits:[]}));
-  laneBox.appendChild(lane('敌人', enemy));
-  wrap.appendChild(laneBox);
+  if(enemy.length) laneBox.appendChild(lane('敌人', enemy));
 
   const ticks = el('div','ticks');
   ticks.appendChild(el('div'));
-  const tk = el('div','t'); 
+  const tk = el('div','t');
   const step = dur > 60 ? 10 : 5;
   for(let s=0;s<=dur;s+=step){ const sp=el('span',null,s+'s');
     sp.style.left=(s/dur*100)+'%'; tk.appendChild(sp); }
-  ticks.appendChild(tk); wrap.appendChild(ticks);
+  ticks.appendChild(tk);
+  return {box: laneBox, ticks};
+}
+
+/* ------------------------------------------------------------ 水位轨 */
+
+function waterlines(res, order, nameMap){
+  const st = res.stats || {};
+  const samples = (st.samples || []).slice().sort((a,b)=>a.f-b.f);
+  const durF = Math.max(1, res.duration_frames);
+  const spMax = st.sp_max || 300;
+  const caps = st.energy_cap || {};
+  const wrap = el('div','wl');
+  wrap.appendChild(el('div','wl-title',
+    '资源水位：技力（全队共享）与各干员终结技能量随时间的变化'));
+  const body = el('div','wl-body');
+  const rows = [];
+
+  function row(label, color, max, getter, energyId){
+    const laneEl = el('div','lane');
+    laneEl.appendChild(el('div','lb', label));
+    const tr = el('div','track');
+    laneEl.appendChild(tr);
+    laneEl.appendChild(el('span','wl-cap', String(Math.round(max))));
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS,'svg');
+    svg.setAttribute('viewBox','0 0 1000 40');
+    svg.setAttribute('preserveAspectRatio','none');
+    if(!samples.length){ return laneEl; }
+    const pts = samples.map(s => {
+      const x = (s.f/durF)*1000;
+      const v = Math.max(0, Math.min(max, getter(s)));
+      const y = 40 - (v/(max||1))*36 - 2;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    if(energyId === null){
+      const area = document.createElementNS(svgNS,'polygon');
+      area.setAttribute('points', `0,40 ${pts} 1000,40`);
+      area.setAttribute('fill', color);
+      area.setAttribute('opacity','0.12');
+      svg.appendChild(area);
+    }
+    const line = document.createElementNS(svgNS,'polyline');
+    line.setAttribute('points', pts);
+    line.setAttribute('fill','none');
+    line.setAttribute('stroke', color);
+    line.setAttribute('stroke-width','1.6');
+    line.setAttribute('vector-effect','non-scaling-stroke');
+    line.setAttribute('stroke-linejoin','round');
+    svg.appendChild(line);
+    tr.appendChild(svg);
+    rows.push({label, max, getter, energyId});
+    return laneEl;
+  }
+
+  body.appendChild(row('技力 SP', '#4ea1ff', spMax, s=>s.sp, null));
+  order.forEach((id, i) => {
+    body.appendChild(row(nameMap[id] || id, OP_COLORS[i % OP_COLORS.length],
+      caps[id] || 100, s=>((s.e||{})[id]||0), id));
+  });
+  wrap.appendChild(body);
+  wrap.appendChild(el('div','wl-legend',
+    '数字为该行满格值（技力全队共享 300；能量按各自终结技需求）'));
+
+  if(samples.length){
+    const cur = el('div','wl-cursor');
+    const tip = el('div','wl-tip');
+    body.appendChild(cur); body.appendChild(tip);
+    body.style.position = 'relative';
+    body.onmousemove = (ev) => {
+      const trackEl = body.querySelector('.track');
+      if(!trackEl) return;
+      const r = trackEl.getBoundingClientRect();
+      const ratio = Math.min(1, Math.max(0, (ev.clientX - r.left) / Math.max(1, r.width)));
+      const f = ratio * durF;
+      let lo = 0, hi = samples.length - 1;
+      while(lo < hi){ const mid = (lo+hi)>>1; if(samples[mid].f < f) lo = mid+1; else hi = mid; }
+      if(lo > 0 && Math.abs(samples[lo-1].f - f) < Math.abs(samples[lo].f - f)) lo -= 1;
+      const s = samples[lo];
+      cur.style.display = 'block'; tip.style.display = 'block';
+      const x = r.left - body.getBoundingClientRect().left + ratio * r.width;
+      cur.style.left = x + 'px';
+      tip.style.left = x + 'px';
+      const parts = [`<b>${(s.f/30).toFixed(2)}s</b>`, `SP ${Math.round(s.sp)}/${Math.round(spMax)}`];
+      rows.filter(x=>x.energyId).forEach(x => {
+        parts.push(`${x.label} ${Math.round(x.getter(s))}/${Math.round(x.max)}`);
+      });
+      tip.innerHTML = parts.join(' · ');
+    };
+    body.onmouseleave = () => { cur.style.display='none'; tip.style.display='none'; };
+  }
+  return wrap;
+}
+
+/* ------------------------------------------------------------ 轴面板 */
+
+function renderAxis(res, t, cfg){
+  const wrap = el('div');
+  const order = t.team;
+  const nameMap = t.name_map || {};
+  if(cfg && cfg.notes){
+    wrap.appendChild(el('div','muted','配置：' + cfg.notes.join(' · ')));
+  }
+  const g = gantt(res, order, nameMap);
+  wrap.appendChild(g.box);
+  wrap.appendChild(g.ticks);
+  wrap.appendChild(waterlines(res, order, nameMap));
 
   const kpi = el('div','kpi');
   kpi.appendChild(kpiBox('cold','DPS', res.dps, res.total_damage));
-  kpi.appendChild(kpiBox('cold','合法性', res.legality_ok?1:0, 0).cloneNode(true));
+  const okBadge = el('div', res.legality_ok ? 'cold' : 'hot');
+  okBadge.appendChild(document.createTextNode('合法性'));
+  okBadge.appendChild(el('b', null, res.legality_ok ? '通过' : '有告警'));
+  kpi.appendChild(okBadge);
+  const casts = (res.stats && res.stats.cast_counts) || {};
+  const CAST_SLOTS = ['normal_attack','power_attack','dash_attack',
+                      'plunging_attack','battle_skill','combo_skill','ultimate'];
+  const nActs = CAST_SLOTS.reduce((a,k)=>a+(casts[k]||0),0);
+  const actBox = el('div');
+  actBox.appendChild(document.createTextNode('施放次数'));
+  actBox.appendChild(el('b', null, String(nActs)));
+  if(casts.auto_attack) actBox.appendChild(document.createTextNode(`（另有自动普攻 ${casts.auto_attack}）`));
+  kpi.appendChild(actBox);
   wrap.appendChild(kpi);
 
   // 元素/物理异常明细（v1.1.0 起有数据）
@@ -276,7 +567,7 @@ function renderAxis(res, t){
     const rxBox = el('div','muted');
     const parts = Object.entries(rxStats.totals)
       .sort((a,b)=>b[1]-a[1])
-      .map(([k,v]) => `${k} ${Math.round(v).toLocaleString()}`);
+      .map(([k,v]) => `${k} ${fmt(v)}`);
     const cnt = Object.entries(rxStats.counts||{})
       .filter(([k])=>k!=='附着')
       .map(([k,v]) => `${k}×${v}`).join(' ');
@@ -288,13 +579,16 @@ function renderAxis(res, t){
   const total = Math.max(1,res.total_damage);
   contrib.textContent = '贡献：' + Object.entries(res.per_operator||{})
     .sort((a,b)=>b[1]-a[1])
-    .map(([cid,d]) => `${(t.name_map||{})[cid]||cid} ${(d/total*100).toFixed(0)}%`).join(' · ');
+    .map(([cid,d]) => `${nameMap[cid]||cid} ${(d/total*100).toFixed(0)}%`).join(' · ');
   wrap.appendChild(contrib);
 
   if(res.legality_issues && res.legality_issues.length){
     const w = el('div','warn','合法性问题：'+res.legality_issues.slice(0,3).join('; '));
     wrap.appendChild(w);
   }
+
+  const det = el('details');
+  det.appendChild(el('summary', null, `动作表（${(res.timeline||[]).filter(e=>e.kind==='cast').length} 个施放）`));
   const tb = el('table');
   tb.innerHTML = '<tr><th>时间(s)</th><th>结束(s)</th><th>动作</th><th>命中(s)</th></tr>';
   (res.timeline||[]).filter(e=>e.kind==='cast'||e.kind==='enemy_attack'||e.kind==='stagger')
@@ -307,50 +601,230 @@ function renderAxis(res, t){
         `<td>${(e.hits||[]).map(h=>(h/30).toFixed(2)).join(', ')}</td>`;
       tb.appendChild(tr);
     });
-  wrap.appendChild(tb);
+  det.appendChild(tb);
+  wrap.appendChild(det);
 
   if(res.warnings && res.warnings.length){
-    const w = el('div','muted');
-    w.textContent = '注意：' + res.warnings.join('；');
-    wrap.appendChild(w);
+    wrap.appendChild(el('div','muted','注意：' + res.warnings.join('；')));
+  }
+  if(res.unmodeled && res.unmodeled.length){
+    const ud = el('details');
+    ud.appendChild(el('summary', null, `未建模项（${res.unmodeled.length}）`));
+    ud.appendChild(el('div','muted', res.unmodeled.join('；')));
+    wrap.appendChild(ud);
   }
   return wrap;
 }
 
+/* ------------------------------------------------------------ 装备/武器推荐 */
+
+async function ensureLoadout(team){
+  if(LOADOUT[team.join(',')]) return LOADOUT[team.join(',')];
+  const data = await jpost('/api/loadout', {team});
+  LOADOUT[team.join(',')] = data.recommendations || {};
+  return LOADOUT[team.join(',')];
+}
+
 async function loadLoadout(t, card){
-  const box = card.querySelector('[id^=loadout-]') || el('div');
-  box.id = box.id || ('loadout-' + Math.random().toString(36).slice(2,7));
-  if(!box.parentNode) card.appendChild(box);
+  let box = card.querySelector('.loadout-box');
+  if(!box){ box = el('div','loadout-box'); card.appendChild(box); }
   box.innerHTML = '<div class="muted">计算中…</div>';
-  const r = await fetch('/api/loadout', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({team: t.team})});
-  const data = await r.json();
-  if(data.error){ box.innerHTML = '<div class="warn">'+data.error+'</div>'; return; }
-  box.innerHTML = '';
-  for(const [cid, row] of Object.entries(data.recommendations || {})){
-    const blk = el('div'); blk.style.margin = '8px 0';
-    blk.appendChild(el('div', null, row.name));
-    const tb = el('table');
-    tb.innerHTML = '<tr><th>武器</th><th>稀有</th><th>ATK</th><th>ATK%</th><th>主属性</th><th>等效</th></tr>';
-    (row.weapons||[]).forEach(w => {
-      const tr = el('tr');
-      tr.innerHTML = `<td>${w.weapon_id}</td><td>${w.rarity}★</td><td>${w.atk}</td>`+
-        `<td>${(w.atk_pct*100).toFixed(0)}%</td><td>+${w.mainattr}</td><td>${Math.round(w.score)}</td>`;
-      tb.appendChild(tr);
-    });
-    blk.appendChild(tb);
-    (row.equipment||[]).forEach(s => {
-      blk.appendChild(el('div','muted', `${s.label}（精锻 ${s.enhance_level}）：` + s.pieces.join('、')));
-    });
-    box.appendChild(blk);
+  try{
+    const rec = await ensureLoadout(t.team);
+    box.innerHTML = '';
+    for(const [cid, row] of Object.entries(rec)){
+      const blk = el('div'); blk.style.margin = '8px 0';
+      blk.appendChild(el('div', null, row.name));
+      const tb = el('table');
+      tb.innerHTML = '<tr><th>武器</th><th>稀有</th><th>ATK</th><th>ATK%</th><th>主属性</th><th>等效</th></tr>';
+      (row.weapons||[]).forEach(w => {
+        const tr = el('tr');
+        tr.innerHTML = `<td>${w.name || w.weapon_id}</td><td>${w.rarity}★</td><td>${w.atk}</td>`+
+          `<td>${(w.atk_pct*100).toFixed(0)}%</td><td>+${w.mainattr}</td><td>${fmt(w.score)}</td>`;
+        tb.appendChild(tr);
+      });
+      blk.appendChild(tb);
+      (row.equipment||[]).forEach(s => {
+        const pieces = s.piece_names && s.piece_names.length ? s.piece_names : s.pieces;
+        const line = el('div','muted', `${s.label}（精锻 ${s.enhance_level}）：` + pieces.join('、'));
+        line.title = (s.pieces||[]).join('\n');
+        blk.appendChild(line);
+      });
+      box.appendChild(blk);
+    }
+    const hint = el('div','muted','想验证收益？点上面的「对比」，把装备换成输出向套装即可看到差值。');
+    box.appendChild(hint);
+  }catch(e){
+    box.innerHTML = ''; box.appendChild(el('div','warn','出错：'+e.message));
   }
 }
+
+/* ------------------------------------------------------------ 对比视图 */
+
+let CMP_TEAM = null;
+
+function sideConfig(side){
+  const wrap = el('div','cmp-side');
+  const h = el('h4'); h.appendChild(el('span','badge', side.toUpperCase())); wrap.appendChild(h);
+
+  function field(label, node){
+    const f = el('div','field');
+    f.appendChild(el('label', null, label));
+    f.appendChild(node);
+    wrap.appendChild(f);
+    return node;
+  }
+  const mode = document.createElement('select');
+  [['cold','冷启动（能量 0）'],['hot','热启动（能量满）']].forEach(([v,l])=>{
+    const o = document.createElement('option'); o.value=v; o.textContent=l; mode.appendChild(o); });
+  field('启动', mode);
+
+  const enemy = document.createElement('select');
+  Object.entries(ENEMY_LABEL).forEach(([v,l])=>{
+    const o = document.createElement('option'); o.value=v; o.textContent=l; enemy.appendChild(o); });
+  field('敌人', enemy);
+
+  const equip = document.createElement('select');
+  (META.equip_presets || [{id:'none',label:'不穿装备'}]).forEach(p=>{
+    const o = document.createElement('option'); o.value=p.id; o.textContent=p.label; equip.appendChild(o); });
+  field('装备', equip);
+
+  const lv = document.createElement('select');
+  for(let i=0;i<=3;i++){ const o=document.createElement('option'); o.value=i; o.textContent='精锻 '+i; lv.appendChild(o); }
+  lv.value = '3';
+  field('精锻', lv);
+
+  const weapon = document.createElement('select');
+  const rec = LOADOUT[(CMP_TEAM||[]).join(',')] || {};
+  const firstRec = Object.values(rec)[0] || {};
+  const wopts = [{v:0, l:'默认武器'}].concat((firstRec.weapons||[]).map((w,i)=>({
+    v:i+1, l:`推荐${'①②③'[i]||i+1} ${w.name||w.weapon_id}（+${w.atk} ATK）`})));
+  wopts.forEach(o=>{ const op=document.createElement('option'); op.value=o.v; op.textContent=o.l; weapon.appendChild(op); });
+  field('武器', weapon);
+
+  wrap._ctrl = {mode, enemy, equip, equip_level: lv, weapon};
+  return wrap;
+}
+
+async function openCompare(t){
+  CMP_TEAM = t.team;
+  $('#cmp-team').textContent = `队伍：${t.names.join(' / ')} · 窗口 ${$('#dur').value}s`;
+  const box = $('#cmp-config'); box.innerHTML = '';
+  try{ await ensureLoadout(t.team); }catch(e){ /* 推荐拿不到也能对比 */ }
+  const a = sideConfig('a'), b = sideConfig('b');
+  // 默认：A = 冷启动无装备；B = 冷启动输出向套装（同一把武器）→ 只对比装备收益
+  a._ctrl.mode.value = 'cold'; a._ctrl.enemy.value = 'normal';
+  b._ctrl.mode.value = 'cold'; b._ctrl.enemy.value = 'normal';
+  b._ctrl.equip.value = 'output';
+  box.appendChild(a); box.appendChild(b);
+  const hint = el('div','muted');
+  hint.style.gridColumn = '1 / -1';
+  hint.textContent = '两边都默认用数据里的「默认武器」（多为低稀有度）。'
+    + '把武器换成推荐①可看到武器差距——它通常比装备更大，不是模型算错。';
+  box.appendChild(hint);
+  $('#cmp-out').innerHTML = '';
+  $('#cmp-status').textContent = '';
+  $('#cmp').classList.add('open');
+  $('#cmp-run').onclick = () => runCompare(t);
+  $('#cmp')._sides = [a, b];
+}
+
+function sideSpec(sideEl){
+  const c = sideEl._ctrl;
+  return {mode: c.mode.value, enemy: c.enemy.value, equip: c.equip.value,
+          equip_level: +c.equip_level.value, weapon: +c.weapon.value};
+}
+
+async function runCompare(t){
+  const sides = $('#cmp')._sides || [];
+  $('#cmp-run').disabled = true;
+  $('#cmp-status').textContent = '对比计算中…';
+  try{
+    const data = await jpost('/api/compare', {
+      team: t.team, duration: +$('#dur').value,
+      a: sideSpec(sides[0]), b: sideSpec(sides[1]),
+    });
+    renderCompare(data, t);
+    $('#cmp-status').textContent = '';
+  }catch(e){ $('#cmp-status').textContent = '出错：'+e.message; }
+  finally{ $('#cmp-run').disabled = false; }
+}
+
+function renderCompare(data, t){
+  const out = $('#cmp-out'); out.innerHTML = '';
+  const A = data.sides.a, B = data.sides.b;
+  const d = data.delta || {};
+
+  const sum = el('div','cmp-sum');
+  sum.appendChild(el('div','muted','差值（B − A）'));
+  const big = el('div','delta ' + (d.total_damage >= 0 ? 'up' : 'down'));
+  big.appendChild(el('b', null, (d.total_damage>=0?'+':'') + fmt(d.total_damage)));
+  big.appendChild(document.createTextNode(' 总伤'));
+  sum.appendChild(big);
+  const pct = el('div','delta ' + (d.damage_pct >= 0 ? 'up' : 'down'));
+  pct.appendChild(el('b', null, (d.damage_pct>=0?'+':'') + (d.damage_pct||0).toFixed(1) + '%'));
+  pct.appendChild(document.createTextNode(' 相对提升'));
+  sum.appendChild(pct);
+  const dpsd = el('div','delta ' + (d.dps >= 0 ? 'up' : 'down'));
+  dpsd.appendChild(el('b', null, (d.dps>=0?'+':'') + fmt(d.dps)));
+  dpsd.appendChild(document.createTextNode(' DPS'));
+  sum.appendChild(dpsd);
+  sum.appendChild(el('div','muted', `A ${fmt(A.rotation.result.total_damage)} → B ${fmt(B.rotation.result.total_damage)}`));
+  out.appendChild(sum);
+
+  const cols = el('div','cmp-cols');
+  [A, B].forEach(side => {
+    const col = el('div','cmp-col');
+    const h = el('h4');
+    h.appendChild(el('span','badge', side.side));
+    h.appendChild(el('span', null, side.config.mode_label + ' · ' + (ENEMY_LABEL[side.config.enemy_profile]||side.config.enemy_profile)));
+    col.appendChild(h);
+    const res = side.rotation.result;
+    const kpi = el('div','kpi');
+    const d1 = el('div', side.config.mode==='hot'?'hot':'cold');
+    d1.appendChild(document.createTextNode('DPS'));
+    d1.appendChild(el('b', null, fmt(res.dps)));
+    d1.appendChild(document.createTextNode('总伤 ' + fmt(res.total_damage)));
+    kpi.appendChild(d1);
+    const d2 = el('div');
+    d2.appendChild(document.createTextNode('合法性'));
+    d2.appendChild(el('b', null, res.legality_ok ? '通过' : '有告警'));
+    kpi.appendChild(d2);
+    col.appendChild(kpi);
+    col.appendChild(el('div','muted','配置：' + side.config.notes.join(' · ')));
+    const g = gantt(res, t.team, data.name_map || t.name_map);
+    col.appendChild(g.box); col.appendChild(g.ticks);
+    col.appendChild(waterlines(res, t.team, data.name_map || t.name_map));
+    (res.warnings||[]).slice(0,2).forEach(w => col.appendChild(el('div','muted','注：'+w)));
+    cols.appendChild(col);
+  });
+  out.appendChild(cols);
+
+  const note = el('div','muted');
+  note.style.marginTop = '10px';
+  note.textContent = '对比的是"同一队、不同配置"的完整轴（含搜索），差值来自配置本身，不是随机波动；'
+    + '未建模项对双方同时生效，因此相对差值比绝对 DPS 更可信。';
+  out.appendChild(note);
+}
+
+$('#cmp-close').onclick = () => $('#cmp').classList.remove('open');
+$('#cmp').onclick = (e) => { if(e.target.id === 'cmp') $('#cmp').classList.remove('open'); };
+
+/* ------------------------------------------------------------ 启动 */
 
 $('#go').onclick = runTeam;
 $('#clr').onclick = () => { Object.keys(STATE).forEach(k=>STATE[k]=0); renderOps(); MODE='cold'; };
 $('#q').oninput = renderOps;
 $('#felem').onchange = renderOps;
-boot();
+
+(async function boot(){
+  try{
+    await waitForData();          // 轮询到 ready 才返回
+    await loadMeta();
+  }catch(e){
+    $('#result').textContent = '后端未就绪：' + e.message;
+  }
+})();
 </script>
 </body>
 </html>

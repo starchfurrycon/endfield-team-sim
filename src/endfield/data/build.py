@@ -54,11 +54,16 @@ _SUFFIX_ORDER = [
 # ---------------------------------------------------------------- 工具
 
 def fetch_skills(src: "github.GithubSource", skill_ids: list[str],
-                 workers: int = 8) -> dict[str, str]:
-    """并行预取技能文件；返回 {skill_id: status}。失败不抛，只记录。"""
+                 workers: int = 8, on_progress=None) -> dict[str, str]:
+    """并行预取技能文件；返回 {skill_id: status}。失败不抛，只记录。
+
+    `on_progress(done, total)` 用于首启进度条（server /api/status）。
+    """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     status: dict[str, str] = {}
+    total = len(skill_ids)
+    done = 0
 
     def one(sid: str) -> tuple[str, str]:
         p = src.local_path(f"Json/SkillData/{sid}.json")
@@ -75,6 +80,12 @@ def fetch_skills(src: "github.GithubSource", skill_ids: list[str],
         for f in as_completed(futs):
             sid, st = f.result()
             status[sid] = st
+            done += 1
+            if on_progress is not None:
+                try:
+                    on_progress(done, total)
+                except Exception:  # noqa: BLE001
+                    pass
     return status
 
 def load_i18n(src: github.GithubSource) -> dict:
@@ -191,10 +202,31 @@ def _clean(s: str | None) -> str | None:
 
 # ---------------------------------------------------------------- 主流程
 
-def build(force: bool = False, verbose: bool = True) -> dict:
+def build(force: bool = False, verbose: bool = True, progress=None) -> dict:
+    """raw → normalized。
+
+    `progress(frac, message)`：0~1 的进度回调，供首启进度条使用（可为 None）。
+    """
+    _printed = {"pct": -100}
+
+    def report(frac: float, msg: str) -> None:
+        pct = int(max(0.0, min(1.0, float(frac))) * 100)
+        if progress is not None:
+            try:
+                progress(max(0.0, min(1.0, float(frac))), msg)
+            except Exception:  # noqa: BLE001
+                pass
+        # 进度回调可能逐文件触发（数百次）。控制台输出必须节流：
+        # 否则 stdout 是管道而读端慢/不读时，print 会阻塞在满的管道缓冲区，
+        # 把整个构建线程挂死（exe 首启实测过）。
+        if verbose and (pct - _printed["pct"] >= 5 or pct >= 100):
+            _printed["pct"] = pct
+            print(f"[build] {pct:3d}% {msg}", flush=True)
+
     config.ensure_dirs()
     src = github.GithubSource()
     head = src.head(refresh=force)
+    report(0.02, f"数据源 {head['repo']}@{head.get('short_sha')}")
 
     if verbose:
         print(f"[build] 数据源 {head['repo']}@{head.get('short_sha')} ({head.get('date')})")
@@ -206,6 +238,7 @@ def build(force: bool = False, verbose: bool = True) -> dict:
     tags_tbl = src.table("CharBattleTagTable.json")
     battle_const = src.table("BattleConst.json")
     i18n = load_i18n(src)
+    report(0.09, f"已读基础表（{len(chars)} 名角色）")
     weapons: dict = {}
     weapon_curves: dict = {}
     try:
@@ -216,6 +249,16 @@ def build(force: bool = False, verbose: bool = True) -> dict:
     except Exception as e:  # noqa: BLE001
         if verbose:
             print(f"[build] 武器表不可用：{type(e).__name__}")
+
+    # 物品表：武器/装备的中文名都挂在这里（WeaponBasicTable 里没有 name）
+    items: dict = {}
+    try:
+        items = src.table("ItemTable.json") or {}
+        if verbose:
+            print(f"[build] 物品 {len(items)} 条")
+    except Exception as e:  # noqa: BLE001
+        if verbose:
+            print(f"[build] 物品表不可用：{type(e).__name__}")
 
     # 天赋 / 潜能 数值表
     teffects: dict = {}
@@ -263,7 +306,15 @@ def build(force: bool = False, verbose: bool = True) -> dict:
                 needed.append(skid)
     if verbose:
         print(f"[build] 需要 {len(needed)} 个技能文件（已缓存则跳过）")
-    fetch_skills(src, needed, workers=8)
+    report(0.12, f"下载技能数据（0 / {len(needed)}）")
+
+    def _skill_progress(done: int, total: int) -> None:
+        # 技能下载占整体进度的 0.12 ~ 0.55（首启最耗时的一段）
+        frac = 0.12 + 0.43 * (done / max(1, total))
+        report(frac, f"下载技能数据（{done} / {total}）")
+
+    fetch_skills(src, needed, workers=8, on_progress=_skill_progress)
+    report(0.55, "技能数据就绪，开始解析干员")
 
     out_dir = config.NORM / "operators"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -422,6 +473,7 @@ def build(force: bool = False, verbose: bool = True) -> dict:
         op.weapon = {
             "skill_bb": wk_bb,
             "id": weapon_id,
+            "name": t((items.get(weapon_id) or {}).get("name")),
             "rarity": w.get("rarity"),
             "max_lv": w.get("maxLv"),
             "atk_by_level": [int(x.get("baseAtk") or 0) for x in curve],
@@ -429,6 +481,8 @@ def build(force: bool = False, verbose: bool = True) -> dict:
         }
         op.mods = _collect_mods(cid, teffects, t)
         operators[cid] = op
+        report(0.55 + 0.22 * (len(operators) / max(1, len(chars) - 2)),
+               f"解析干员（{len(operators)} / {len(chars) - 2}）")
 
     # ---- wiki 文本（逐干员，限速）
     wsd: dict = {}
@@ -439,6 +493,7 @@ def build(force: bool = False, verbose: bool = True) -> dict:
             print(f"[build] wiki skilldata 不可用：{type(e).__name__}")
 
     wiki_ok = 0
+    wiki_total = sum(1 for op in operators.values() if op.name_zh) or 1
     for cid, op in operators.items():
         if not op.name_zh:
             continue
@@ -461,7 +516,9 @@ def build(force: bool = False, verbose: bool = True) -> dict:
             wiki.polite_sleep()
         except Exception as e:  # noqa: BLE001
             op.wiki = {"title": op.name_zh, "error": f"{type(e).__name__}: {e}"}
+        report(0.77 + 0.13 * (wiki_ok / wiki_total), f"抓取 Wiki 文本（{wiki_ok} / {wiki_total}）")
 
+    report(0.91, "写归一化数据")
     # ---- 落盘
     for cid, op in operators.items():
         (out_dir / f"{cid}.json").write_text(
@@ -508,7 +565,10 @@ def build(force: bool = False, verbose: bool = True) -> dict:
                     continue
                 key = str(m.get("attrType"))
                 attrs[key] = [float(v or 0.0) for v in vals[:4]]
-            equip_index[iid] = {"attrs": attrs}
+            item = items.get(iid) or {}
+            equip_index[iid] = {"attrs": attrs,
+                                "name": t(item.get("name")) or iid,
+                                "rarity": item.get("rarity")}
         suit_index = {}
         for sid, v in suits.items():
             bbs = {}
@@ -552,6 +612,7 @@ def build(force: bool = False, verbose: bool = True) -> dict:
                         if v:
                             bb[x["key"]] = bb.get(x["key"], 0.0) + v
             w_index[wid] = {
+                "name": t((items.get(wid) or {}).get("name")) or wid,
                 "rarity": w.get("rarity"),
                 "weapon_type": w.get("weaponType"),
                 "atk_by_level": [int(x.get("baseAtk") or 0) for x in curve],
@@ -582,6 +643,7 @@ def build(force: bool = False, verbose: bool = True) -> dict:
         from .coverage import write_crosscheck
         write_crosscheck(cross)
 
+    report(1.0, f"完成：{len(operators)} 名干员，version={version}")
     if verbose:
         print(f"[build] {len(operators)} 干员，{wiki_ok} 有 wiki 文本，version={version}")
     return manifest
