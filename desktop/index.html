@@ -258,6 +258,20 @@ function renderAxis(res, t){
   kpi.appendChild(kpiBox('cold','合法性', res.legality_ok?1:0, 0).cloneNode(true));
   wrap.appendChild(kpi);
 
+  // 元素/物理异常明细（v1.1.0 起有数据）
+  const rxStats = (res.stats && res.stats.reactions) || null;
+  if (rxStats && rxStats.totals && Object.keys(rxStats.totals).length) {
+    const rxBox = el('div','muted');
+    const parts = Object.entries(rxStats.totals)
+      .sort((a,b)=>b[1]-a[1])
+      .map(([k,v]) => `${k} ${Math.round(v).toLocaleString()}`);
+    const cnt = Object.entries(rxStats.counts||{})
+      .filter(([k])=>k!=='附着')
+      .map(([k,v]) => `${k}×${v}`).join(' ');
+    rxBox.textContent = `异常伤害：${parts.join(' · ')}${cnt ? '（' + cnt + '）' : ''}`;
+    wrap.appendChild(rxBox);
+  }
+
   const contrib = el('div','muted');
   const total = Math.max(1,res.total_damage);
   contrib.textContent = '贡献：' + Object.entries(res.per_operator||{})
