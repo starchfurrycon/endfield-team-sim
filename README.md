@@ -85,12 +85,16 @@ Python 3.10+，**无第三方依赖**（仅标准库）。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/status` | 构建状态：`state / percent / message / elapsed_s / ready` |
-| GET | `/api/meta` | 干员列表 + 常量来源 + 可选预设；构建中返回 503 |
+| GET | `/api/status` | 状态机快照：构建状态、进度、`llm_run`、`events` |
+| GET | `/api/meta` | 干员列表 + 常量来源 + 预设；构建中返回 503 |
 | GET | `/api/axis` | 单队一条轴：`team / mode / duration / enemy / equip / weapon` |
 | POST | `/api/team` | 约束配队 Top-N |
 | POST | `/api/compare` | 两套配置并排对比（`a` / `b` 各一份配置） |
 | POST | `/api/loadout` | 每人的武器 3 选 + 装备 2 套 |
+| GET | `/api/llm` | LLM 配置（密钥掩码）+ 复核任务状态 |
+| POST | `/api/llm` | 保存 LLM 配置（`base/model/key/enabled`） |
+| POST | `/api/llm/test` | 测试连接 |
+| POST | `/api/llm/run` | 触发一次复核（`mode=gaps|all`、`limit`） |
 
 无第三方依赖（stdlib `http.server`），只监听 `127.0.0.1`。
 
@@ -249,6 +253,7 @@ python run.py llm --apply --mode all --dry-run     # 全量试跑，不写回
 
 ## 文档
 
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) 工程结构 / 状态机 / 打包 / 扩展点
 - [`docs/01-调研.md`](docs/01-调研.md) 调研报告（机制 / 数据源 / 前作 / 风险）
 - [`docs/02-计划.md`](docs/02-计划.md) 执行计划与验收标准
 - [`docs/03-进展.md`](docs/03-进展.md) 逐阶段进展与**偏离说明**
