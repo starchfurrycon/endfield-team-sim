@@ -48,6 +48,75 @@ def _known_suit_key(key: str) -> bool:
     return key in _SUIT_KEYS or key.endswith("_dmg_up") or key.endswith("_up")
 
 
+def llm_items(ds: Dataset, limit: int = 40) -> list[dict]:
+    """收集"引擎不认识的东西"，供 LLM 归类（只解释，不改引擎）。"""
+    equip = _equip()
+    categorize = _categorizer(ds)
+    meta = (ds.constants or {}).get("attr_meta") or {}
+    items: list[dict] = []
+
+    # 套装被动里不认识的 key
+    seen: dict[str, dict] = {}
+    for sid, srow in (equip.get("suits") or {}).items():
+        for k, v in (srow.get("passive_bb") or {}).items():
+            if _known_suit_key(k):
+                continue
+            row = seen.setdefault(k, {"key": k, "samples": [], "context": "套装被动"})
+            if len(row["samples"]) < 3:
+                row["samples"].append(v)
+            if sid not in row["context"]:
+                row["context"] += f" / {sid}"
+    items.extend(seen.values())
+
+    # 武器条件型技能
+    wseen = {}
+    for op in ds.operators.values():
+        for sid in ((op.weapon or {}).get("skills") or []):
+            if str(sid).startswith("sk_wpn_") and sid not in wseen:
+                wseen[sid] = {"key": str(sid), "samples": [],
+                              "context": f"武器条件型技能（{op.name_zh} 默认武器）"}
+    items.extend(list(wseen.values())[:10])
+
+    # 未定性属性 id
+    used: Counter = Counter()
+    for row in (equip.get("items") or {}).values():
+        for k in (row.get("attrs") or {}):
+            try:
+                used[int(k)] += 1
+            except (TypeError, ValueError):
+                continue
+    for a, n in used.items():
+        if categorize(a) is None:
+            icon = (meta.get(str(a)) or {}).get("icon", "")
+            items.append({"key": f"attrType {a}", "samples": [], "context": f"装备属性（出现 {n} 次，icon={icon}）"})
+    return items[:limit]
+
+
+def write_llm_mechanics(rows: list[dict], model: str = "") -> Path:
+    config.ensure_dirs()
+    lines = ["# LLM 机制归类（未建模项）", "",
+             "> LLM 只给**解释与分类**，不会修改引擎；这份报告用来判断"
+             "下一版该补哪些机制。", ""]
+    if model:
+        lines += [f"- 模型：`{model}`", ""]
+    lines += ["| key | 归类 | 引擎是否建模 | 含义 | 置信度 |",
+              "|---|---|---|---|---|"]
+    for r in rows:
+        lines.append(f"| `{r['key']}` | {r['category']} | "
+                     f"{'是' if r['modeled_by_engine'] else '否'} | "
+                     f"{r['meaning']} | {r['confidence']} |")
+    lines.append("")
+    unmodeled = [r for r in rows if not r["modeled_by_engine"]]
+    if unmodeled:
+        lines += ["## 下一版可以考虑补的", ""]
+        for r in unmodeled:
+            lines.append(f"- `{r['key']}`（{r['category']}）：{r['meaning']}")
+        lines.append("")
+    p = config.REPORTS / "mechanics-review.md"
+    p.write_text("\n".join(lines), encoding="utf-8")
+    return p
+
+
 def write_report(ds: Dataset, manifest: dict | None = None) -> Path:
     config.ensure_dirs()
     manifest = manifest or {}

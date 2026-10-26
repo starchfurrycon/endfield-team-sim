@@ -1,5 +1,43 @@
 # Changelog
 
+## v2.5.0 (2026-10-26)
+
+**LLM 自更新**：游戏更新后，新技能文本的机制含义（触发条件 / 元素 / 异常 / 定位）
+由 LLM 复核并写回，用户可以配置自己的 API。提示词与校验策略做成可审查的仓库资产。
+
+### 新增
+
+- **LLM 配置（用户自带 API）**：界面右上角 `LLM` 设置（接口 / 模型 / Key / 测试连接），
+  或 `python run.py llm --base ... --model ... --key ... --enable`；
+  也支持 `ENDFIELD_LLM_*` 环境变量。Key 只存本机 `data/llm.json`（已 gitignore），接口只回传掩码。
+- **一键复核**：界面「运行复核」（范围：仅不确定 / 全部），
+  或 `python run.py update --llm` / `python run.py llm --apply`。
+  只补规则不确定的技能（未知触发、缺元素、低置信度），有缓存不重复计费。
+- **提示词工程**（`src/endfield/semantics/prompts/`）：
+  - `semantics_system.md`：角色/禁区/字段语义/易错规则/术语表/5 个真实技能 few-shot
+  - `semantics_repair.md`：校验失败后的定向修复
+  - `mechanics_system.md`：未知黑板 key 归类（只写报告，不改引擎）
+  - `README.md`：设计理由、置信度标尺、成本控制、失败模式、评估方法
+- **反幻觉硬约束**（代码强制）：输出必须过 schema；`evidence` 必须是原文逐字子串，
+  否则修复一次后丢弃；数值字段强制清空；无文本技能不调用。
+- **复核报告** `data/reports/llm-review.md`：被改写技能（原值→新值、置信度、证据）、
+  规则/LLM 冲突、仍 unknown 的低置信度项、如何复核与改提示词。
+- **机制归类报告** `data/reports/mechanics-review.md`（`llm --mechanics`）：
+  未建模黑板 key 的语义归类，用来决定下一版补哪些机制。
+- CLI `llm` 子命令：`--show / --test / --apply / --dry-run / --clear-cache`。
+- 语义 schema 增加 `role` / `evidence` 字段，`element` 收紧为封闭枚举。
+
+### 说明（边界）
+
+LLM 负责**可验证的语义自更新**（文本 → 类别标签），不产出数值、不改引擎。
+全新伤害机制/叠加规则仍需要改代码；这类会显式出现在 `unmodeled` 与数据自检报告里。
+
+### 测试
+
+119 项（新增 24 项：配置与掩码、提示词渲染、证据校验、修复重试、合并策略、
+缓存命中、tokens 统计、机制归类、接口掩码与连接测试）。全部用假 transport，不联网。
+
+
 ## v2.4.2 (2026-10-26)
 
 界面排版小修（v2.4.1 的补充）。

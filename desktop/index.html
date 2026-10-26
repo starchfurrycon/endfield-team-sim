@@ -142,6 +142,26 @@
            padding:8px 10px;background:var(--panel2);border-radius:8px;font-size:12px}
   .cmp-sum b{font-size:19px}
   .up{color:var(--ok)} .down{color:var(--bad)}
+  /* LLM 设置 */
+  #llm-btn{display:flex;gap:6px;align-items:center;padding:3px 9px;font-size:11px;
+           font-weight:500;background:transparent;border:1px solid var(--line);
+           color:var(--dim)}
+  #llm-btn.on{color:var(--fg);border-color:rgba(94,231,242,.5)}
+  #llm-btn .dot2{width:7px;height:7px;border-radius:50%;background:#5d6b76}
+  #llm-btn.on .dot2{background:#5ee7f2;box-shadow:0 0 6px #5ee7f2}
+  .llm-grid{display:grid;grid-template-columns:86px 1fr;gap:8px;align-items:center;
+            margin:8px 0}
+  .llm-grid input[type=text],.llm-grid input[type=password]{width:100%}
+  .llm-note{font-size:11px;color:var(--dim);line-height:1.6;margin-top:8px}
+  .llm-run{border:1px solid var(--line);border-radius:8px;padding:8px;margin-top:10px}
+  .llm-run .row{margin-bottom:6px}
+  .pill{display:inline-block;font-size:10px;padding:1px 7px;border-radius:999px;
+        border:1px solid var(--line);color:var(--dim)}
+  .pill.ok{color:var(--ok);border-color:rgba(63,185,80,.45)}
+  .pill.bad{color:var(--bad);border-color:rgba(248,81,73,.45)}
+  .pill.run{color:var(--warn);border-color:rgba(255,180,84,.45)}
+  .llm-table{width:100%;font-size:11px}
+  .llm-table td{padding:2px 4px;border-bottom:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -150,6 +170,8 @@
   <h1>终末地配队模拟</h1>
   <span class="chip" id="ver">…</span>
   <span class="chip" id="build-pill" hidden></span>
+  <span style="flex:1"></span>
+  <button id="llm-btn" title="LLM 自更新设置"><span class="dot2"></span>LLM</button>
 </header>
 
 <main>
@@ -199,6 +221,54 @@
     <div class="cmp-grid" id="cmp-config"></div>
     <div class="row"><button id="cmp-run">开始</button><span class="muted" id="cmp-status"></span></div>
     <div class="cmp-out" id="cmp-out"></div>
+  </div>
+</div>
+
+<!-- LLM 设置 / 自更新 -->
+<div id="llm" class="modal">
+  <div class="modal-card" style="width:min(720px,100%)">
+    <button class="close" id="llm-close">×</button>
+    <h2>LLM 自更新</h2>
+    <div class="muted" id="llm-state">…</div>
+
+    <div class="llm-grid">
+      <span class="muted">启用</span>
+      <label style="display:flex;gap:8px;align-items:center;font-size:12px">
+        <input type="checkbox" id="llm-enabled" />
+        <span class="muted">勾选后，重建数据时自动用 LLM 复核语义</span>
+      </label>
+      <span class="muted">接口</span>
+      <input type="text" id="llm-base" placeholder="https://api.deepseek.com/v1" />
+      <span class="muted">模型</span>
+      <input type="text" id="llm-model" placeholder="deepseek-chat" />
+      <span class="muted">API Key</span>
+      <input type="password" id="llm-key" placeholder="留空 = 不修改已保存的密钥" autocomplete="off" />
+    </div>
+    <div class="row">
+      <button id="llm-save">保存</button>
+      <button id="llm-test" class="ghost">测试连接</button>
+      <span class="muted" id="llm-msg"></span>
+    </div>
+    <div class="llm-note">
+      只把技能描述文本发给你配置的接口；密钥保存在本机 <code id="llm-path">data/llm.json</code>，
+      不会写进仓库，也不会回传给页面（只显示掩码）。未配置时全部走规则通道。
+    </div>
+
+    <div class="llm-run">
+      <div class="row">
+        <span class="muted">复核范围</span>
+        <select id="llm-mode">
+          <option value="gaps">仅不确定（省 token）</option>
+          <option value="all">全部技能</option>
+        </select>
+        <span class="muted">上限</span>
+        <input id="llm-limit" type="number" placeholder="全部" style="width:62px" />
+        <button id="llm-run-btn">运行复核</button>
+        <span class="pill" id="llm-run-pill">空闲</span>
+      </div>
+      <div class="muted" id="llm-run-msg"></div>
+      <div id="llm-run-out"></div>
+    </div>
   </div>
 </div>
 
@@ -763,6 +833,145 @@ function renderCompare(data, t){
 $('#cmp-close').onclick = () => $('#cmp').classList.remove('open');
 $('#cmp').onclick = (e) => { if(e.target.id === 'cmp') $('#cmp').classList.remove('open'); };
 
+/* ------------------------------------------------------------ LLM 自更新 */
+
+let LLM = null, LLM_POLL = null, LLM_OPEN = false;
+
+function llmChip(){
+  const b = $('#llm-btn');
+  if(!b) return;
+  const on = !!(LLM && LLM.available);
+  b.classList.toggle('on', on);
+  b.title = on
+    ? `LLM 已启用 · ${LLM.model} · prompt ${LLM.prompt_version}`
+    : 'LLM 未配置（规则模式）';
+}
+
+async function loadLLM(){
+  try{ LLM = await jget('/api/llm'); }catch(e){ /* 旧后端没有该接口 */ }
+  llmChip();
+  if(LLM_OPEN) fillLLM();
+}
+
+function fillLLM(){
+  if(!LLM) return;
+  $('#llm-state').textContent =
+    (LLM.available ? `已启用 · ${LLM.model}` : '未配置（规则模式）')
+    + ` · prompt ${LLM.prompt_version} · 缓存 ${LLM.cache_files} 条`;
+  $('#llm-enabled').checked = !!LLM.enabled;
+  $('#llm-base').value = LLM.base || '';
+  $('#llm-model').value = LLM.model || '';
+  $('#llm-key').value = '';
+  $('#llm-key').placeholder = LLM.has_key
+    ? `已保存（${LLM.key_masked}），留空不修改` : '粘贴 API key';
+  $('#llm-path').textContent = LLM.config_path || 'data/llm.json';
+  renderLLMRun(LLM.run || {});
+}
+
+$('#llm-btn').onclick = async () => {
+  LLM_OPEN = true;
+  $('#llm').classList.add('open');
+  await loadLLM();
+  fillLLM();
+};
+$('#llm-close').onclick = () => { LLM_OPEN = false; $('#llm').classList.remove('open'); };
+$('#llm').onclick = (e) => {
+  if(e.target.id === 'llm'){ LLM_OPEN = false; $('#llm').classList.remove('open'); }
+};
+
+$('#llm-save').onclick = async () => {
+  const patch = {
+    enabled: $('#llm-enabled').checked,
+    base: $('#llm-base').value.trim(),
+    model: $('#llm-model').value.trim(),
+  };
+  const key = $('#llm-key').value.trim();
+  if(key) patch.key = key;
+  try{
+    LLM = await jpost('/api/llm', patch);
+    $('#llm-msg').textContent = '已保存';
+    fillLLM(); llmChip();
+  }catch(e){ $('#llm-msg').textContent = e.message; }
+};
+
+$('#llm-test').onclick = async () => {
+  $('#llm-msg').textContent = '测试中…';
+  try{
+    const r = await jpost('/api/llm/test');
+    $('#llm-msg').textContent = r.ok
+      ? `连接成功 · ${r.model} · ${r.latency_ms}ms`
+      : `失败：${r.error}`;
+  }catch(e){ $('#llm-msg').textContent = e.message; }
+};
+
+$('#llm-run-btn').onclick = async () => {
+  const mode = $('#llm-mode').value;
+  const limit = $('#llm-limit').value;
+  try{
+    await jpost('/api/llm/run', {mode, limit: limit ? +limit : undefined});
+    $('#llm-run-pill').className = 'pill run';
+    $('#llm-run-pill').textContent = '运行中';
+    startLLMPoll();
+  }catch(e){
+    $('#llm-run-pill').className = 'pill bad';
+    $('#llm-run-pill').textContent = '失败';
+    $('#llm-run-msg').textContent = e.message;
+  }
+};
+
+function startLLMPoll(){
+  if(LLM_POLL) return;
+  LLM_POLL = setInterval(async () => {
+    try{
+      LLM = await jget('/api/llm');
+      llmChip();
+      renderLLMRun(LLM.run || {});
+      if(LLM.run && LLM.run.state !== 'running'){
+        clearInterval(LLM_POLL); LLM_POLL = null;
+        if(LLM.run.state === 'done') await loadMeta();
+      }
+    }catch(e){}
+  }, 900);
+}
+
+function renderLLMRun(run){
+  const pill = $('#llm-run-pill'), msg = $('#llm-run-msg'), out = $('#llm-run-out');
+  if(run.state === 'running'){
+    pill.className = 'pill run'; pill.textContent = '运行中';
+    msg.textContent = run.message || '';
+  }else if(run.state === 'done'){
+    pill.className = 'pill ok'; pill.textContent = '完成'; msg.textContent = '';
+  }else if(run.state === 'error'){
+    pill.className = 'pill bad'; pill.textContent = '失败';
+    msg.textContent = run.error || '';
+  }else{
+    pill.className = 'pill'; pill.textContent = '空闲'; msg.textContent = '';
+  }
+  if(run.state === 'done' && run.stats){
+    const s = run.stats;
+    out.innerHTML = '';
+    const tb = el('table', 'llm-table');
+    tb.innerHTML =
+      `<tr><td>采纳 / 拒绝</td><td>${s.llm_used} / ${s.llm_rejected}`
+      + `（缓存 ${s.llm_cache}，修复 ${s.repaired}）</td></tr>`
+      + `<tr><td>被改写技能</td><td>${s.changed_skills} · 冲突 ${s.conflicts}</td></tr>`
+      + `<tr><td>tokens</td><td>${s.prompt_tokens} + ${s.completion_tokens}`
+      + (s.cost ? ` · 约 ${s.cost}` : '') + `</td></tr>`
+      + `<tr><td>trigger 未知率</td><td>${(s.unknown_rate * 100).toFixed(1)}%</td></tr>`;
+    out.appendChild(tb);
+    if((s.changes || []).length){
+      const line = el('div', 'llm-note');
+      line.textContent = s.changes.slice(0, 6).map(c =>
+        `${c.operator}/${c.skill}: ` + c.changes.map(x =>
+          `${x.field} ${x.before}→${x.after}`).join(', ')).join('；');
+      out.appendChild(line);
+    }
+    const hint = el('div', 'llm-note',
+      '报告：data/reports/llm-review.md（建议人工过一遍「被改写」表）');
+    out.appendChild(hint);
+  }
+}
+
 /* ------------------------------------------------------------ 绑定 */
 
 $('#go').onclick = runTeam;
@@ -773,6 +982,7 @@ $('#q').oninput = renderOps;
   try{
     await waitForData();
     await loadMeta();
+    await loadLLM();
   }catch(e){
     $('#result').textContent = e.message;
   }

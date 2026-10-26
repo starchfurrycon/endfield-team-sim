@@ -36,3 +36,6 @@ release/
 
 # 干员头像（运行时从社区 wiki 抓取，不随仓库分发）
 data/avatars/
+
+# LLM 配置（含 API key，只存本机）
+data/llm.json

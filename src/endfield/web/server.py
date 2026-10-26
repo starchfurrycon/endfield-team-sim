@@ -39,6 +39,17 @@ BUILD: dict = {
 }
 _BUILD_LOCK = threading.Lock()
 
+# LLM 复核任务状态（/api/llm 里的 run 字段）
+LLM_RUN: dict = {
+    "state": "idle",        # idle | running | done | error
+    "message": "",
+    "error": None,
+    "stats": None,
+    "started_at": None,
+    "finished_at": None,
+}
+_LLM_LOCK = threading.Lock()
+
 
 # ---------------------------------------------------------------- 数据集
 
@@ -90,10 +101,15 @@ def _run_build(verbose: bool = False) -> None:
         BUILD.update(percent=92, message="抽取技能语义…")
         try:
             from ..semantics import apply as sem
+            from ..semantics import llm_config
+            cfg = llm_config.load()
             ops = sem.load_operators()
-            stats = sem.apply_to_operators(ops, use_llm=False, verbose=False)
+            stats = sem.apply_to_operators(
+                ops, use_llm=llm_config.available(cfg), cfg=cfg, verbose=verbose)
             sem.save_operators(ops)
             sem.write_semantics_report(ops, stats)
+            if stats.get("llm_enabled"):
+                sem.write_llm_review(ops, stats, cfg)
         except Exception as e:  # noqa: BLE001
             if verbose:
                 print(f"[serve] 语义层跳过：{type(e).__name__}")
@@ -136,6 +152,90 @@ def start_build(verbose: bool = False) -> None:
 
 # ---------------------------------------------------------------- 业务
 
+# ---------------------------------------------------------------- LLM
+
+def _llm_mod():
+    from ..semantics import llm, llm_config
+    return llm, llm_config
+
+
+def llm_status() -> dict:
+    llm, llm_config = _llm_mod()
+    cfg = llm_config.load()
+    pub = llm_config.public(cfg)
+    st = llm.cache_stats()
+    return {**pub,
+            "available": llm_config.available(cfg),
+            "prompt_version": llm.PROMPT_VERSION,
+            "cache_files": st["files"],
+            "cache_kb": round(st["bytes"] / 1024),
+            "run": dict(LLM_RUN)}
+
+
+def llm_save(payload: dict) -> dict:
+    _, llm_config = _llm_mod()
+    patch = {}
+    for k in ("enabled", "base", "model", "key", "temperature", "max_tokens",
+              "timeout_s", "price_in", "price_out"):
+        if k in payload:
+            patch[k] = payload[k]
+    cfg = llm_config.save(patch)          # 校验失败抛 ValueError
+    return {**llm_status(), "saved": True, "key_masked": llm_config.mask_key(cfg["key"])}
+
+
+def llm_test() -> dict:
+    llm, _ = _llm_mod()
+    return llm.test_connection()
+
+
+def _public_stats(stats: dict) -> dict:
+    keep = ("skills", "known_trigger", "unknown_trigger", "unknown_rate",
+            "hit_dependent", "llm_used", "llm_rejected", "llm_cache",
+            "llm_calls", "repaired", "prompt_tokens", "completion_tokens",
+            "cost", "mode", "prompt_version")
+    out = {k: stats.get(k) for k in keep}
+    out["changed_skills"] = len(stats.get("changes") or [])
+    out["conflicts"] = len(stats.get("conflicts") or [])
+    out["changes"] = (stats.get("changes") or [])[:40]
+    out["conflict_items"] = (stats.get("conflicts") or [])[:20]
+    return out
+
+
+def _llm_job(mode: str = "gaps", limit: int | None = None) -> None:
+    with _LLM_LOCK:
+        LLM_RUN.update(state="running", message="加载数据集…", error=None,
+                       stats=None, started_at=time.time(), finished_at=None)
+    try:
+        from ..semantics import apply as sem_apply
+        llm, llm_config = _llm_mod()
+        cfg = llm_config.load()
+        if not llm_config.available(cfg):
+            raise RuntimeError("LLM 未配置（需要启用 + API key）")
+        ops = sem_apply.load_operators()
+        if not ops:
+            raise RuntimeError("没有数据集，先构建")
+        LLM_RUN["message"] = f"复核 {len(ops)} 名干员的技能…"
+        stats = sem_apply.apply_to_operators(
+            ops, use_llm=True, mode=mode, limit=limit, cfg=cfg, verbose=False)
+        sem_apply.save_operators(ops)
+        sem_apply.write_semantics_report(ops, stats)
+        sem_apply.write_llm_review(ops, stats, cfg)
+        _CACHE["ds"] = None
+        LLM_RUN.update(state="done", message="完成", stats=_public_stats(stats),
+                       finished_at=time.time())
+    except Exception as e:  # noqa: BLE001
+        LLM_RUN.update(state="error", message="失败",
+                       error=f"{type(e).__name__}: {e}", finished_at=time.time())
+
+
+def start_llm_run(mode: str = "gaps", limit: int | None = None) -> dict:
+    if LLM_RUN["state"] == "running":
+        return dict(LLM_RUN)
+    threading.Thread(target=_llm_job, kwargs={"mode": mode, "limit": limit},
+                     daemon=True, name="endfield-llm").start()
+    return dict(LLM_RUN)
+
+
 def meta() -> dict:
     ds = dataset()
     from ..data import curated as curated_mod
@@ -174,8 +274,18 @@ def meta() -> dict:
             "variants": variants,
             "note": (curated_mod.spec_for(op.char_id) or {}).get("note"),
         })
+    llm_info = {}
+    try:
+        llm, llm_config = _llm_mod()
+        cfg = llm_config.load()
+        llm_info = {"available": llm_config.available(cfg),
+                    "model": cfg.get("model"), "prompt_version": llm.PROMPT_VERSION,
+                    "cache_files": llm.cache_stats()["files"]}
+    except Exception:  # noqa: BLE001
+        pass
     return {"version": ds.version, "count": len(ops), "operators": ops,
             "app_version": __version__,
+            "llm": llm_info,
             "constants": {k: v for k, v in config.GUESSED.items()},
             "enemies": {"slow": 12, "normal": 8, "fast": 5, "burst": 4},
             "equip_presets": [{"id": "none", "label": "不穿装备"},
@@ -377,6 +487,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(404, {"error": "no avatar"})
         if path == "/api/status":
             return self._json(200, status())
+        if path == "/api/llm":
+            try:
+                return self._json(200, llm_status())
+            except Exception as e:  # noqa: BLE001
+                return self._json(500, {"error": f"{type(e).__name__}: {e}"})
         if path == "/api/meta":
             if not self._need_data():
                 return None
@@ -425,6 +540,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, axis(payload))
             if u.path == "/api/compare":
                 return self._json(200, compare(payload))
+            if u.path == "/api/llm":
+                return self._json(200, llm_save(payload))
+            if u.path == "/api/llm/test":
+                return self._json(200, llm_test())
+            if u.path == "/api/llm/run":
+                if not self._need_data():
+                    return None
+                return self._json(200, start_llm_run(
+                    str(payload.get("mode") or "gaps"),
+                    int(payload["limit"]) if payload.get("limit") else None))
         except Exception as e:  # noqa: BLE001
             return self._json(500, {"error": f"{type(e).__name__}: {e}"})
         return self._json(404, {"error": "not found"})

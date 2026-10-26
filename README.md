@@ -171,6 +171,77 @@ BWIKI 语义   ──┘                    └─ 中文描述/天赋/潜能
 
 ---
 
+## LLM 自更新（可选，自带 API）
+
+游戏更新后，真正会变的不只是"多了个干员"，还有**新技能文本的机制含义**
+（触发条件、元素、异常、角色定位）。这部分规则层覆盖不全，LLM 正好补位。
+
+> 边界说清楚：LLM 提供的是**可验证的语义自更新**；
+> "新伤害机制 / 新 buff 叠加规则"仍然要改引擎——这类会显式列进 `unmodeled`，
+> 不会被假装算对。本项目不承诺"完全不看就永远正确"。
+
+### 配置（三选一）
+
+1. **界面**：右上角 `LLM` → 填接口 / 模型 / API Key → 保存 → 测试连接。
+2. **命令行**：
+   ```bash
+   python run.py llm --base https://api.deepseek.com/v1 \
+                      --model deepseek-chat --key sk-xxx --enable
+   python run.py llm --test
+   ```
+3. **环境变量**（CI 用）：`ENDFIELD_LLM_BASE` / `ENDFIELD_LLM_MODEL` /
+   `ENDFIELD_LLM_API_KEY` / `ENDFIELD_LLM_ENABLED`。
+
+密钥只写在本机 `data/llm.json`（已 gitignore），接口只回传掩码。
+
+### 更新流程
+
+```bash
+python run.py update --llm        # sync → build → 规则 + LLM 复核 → 自检
+python run.py llm --apply --mode gaps --limit 20   # 只复核"不确定"的技能
+python run.py llm --apply --mode all --dry-run     # 全量试跑，不写回
+```
+
+界面里也能直接点「运行复核」：范围可选「仅不确定（省 token）/ 全部」，
+跑完刷新数据并给出统计（采纳/拒绝、改写数、tokens、成本估算）。
+
+### 它到底改了什么
+
+每次复核都会写 [`data/reports/llm-review.md`](data/reports/llm-review.md)：
+
+- **被改写技能**表：字段、原值 → 新值、置信度、**原文证据**；
+- **冲突**：规则与 LLM 不一致时保留规则，交给人判；
+- **仍 unknown / 低置信度**：LLM 也没把握的部分；
+- 怎么复核、怎么改 `curated.json`、什么时候该改提示词。
+
+硬约束（代码强制，不靠模型自觉）：
+
+- 不接收任何数值（技力/能量字段会被清空）；
+- 输出必须过 schema（封闭枚举）；
+- `evidence` 必须是原文逐字子串，否则重试一次后丢弃；
+- 没文本的技能不调用（省 token，也不瞎猜）。
+
+### 提示词
+
+提示词是仓库资产，不是藏在代码里的字符串：
+
+- [`semantics_system.md`](src/endfield/semantics/prompts/semantics_system.md)
+- [`semantics_repair.md`](src/endfield/semantics/prompts/semantics_repair.md)（校验失败修复）
+- [`mechanics_system.md`](src/endfield/semantics/prompts/mechanics_system.md)（未知黑板键归类）
+- [`examples.json`](src/endfield/semantics/prompts/examples.json)（5 个真实技能 few-shot）
+- 设计说明与评估方法：[`prompts/README.md`](src/endfield/semantics/prompts/README.md)
+
+改动提示词语义时必须把 `llm.py:PROMPT_VERSION` +1，否则缓存会复用旧结果。
+
+### 隐私与成本
+
+- 只发送**技能描述文本**（没有账号、没有本机路径、没有数据表）；
+- 默认 `gaps` 模式只问不确定的技能，一个版本通常 10~30 次调用；
+- 缓存按（提示词版本, 模型, 输入）内容寻址，同一技能只计费一次；
+- 在 `data/llm.json` 填 `price_in` / `price_out`（元/百万 token）后会显示估算成本。
+
+---
+
 ## 文档
 
 - [`docs/01-调研.md`](docs/01-调研.md) 调研报告（机制 / 数据源 / 前作 / 风险）

@@ -45,13 +45,20 @@ def cmd_sync(args) -> int:
 
 def cmd_semantics(args) -> int:
     from .semantics import apply as sem_apply
+    from .semantics import llm_config
     ops = sem_apply.load_operators()
     if not ops:
         print("[semantics] 没有数据集，先运行 build")
         return 1
-    stats = sem_apply.apply_to_operators(ops, use_llm=args.llm)
+    cfg = llm_config.load()
+    stats = sem_apply.apply_to_operators(ops, use_llm=args.llm,
+                                         mode=getattr(args, "llm_mode", "gaps"),
+                                         limit=getattr(args, "llm_limit", None),
+                                         cfg=cfg)
     sem_apply.save_operators(ops)
     p = sem_apply.write_semantics_report(ops, stats)
+    if stats.get("llm_enabled"):
+        print(f"[semantics] LLM 复核报告：{sem_apply.write_llm_review(ops, stats, cfg)}")
     print(f"[semantics] 报告：{p}")
     return 0
 
@@ -67,10 +74,16 @@ def cmd_build(args) -> int:
 
     if not args.no_semantics:
         from .semantics import apply as sem_apply
+        from .semantics import llm_config
+        cfg = llm_config.load()
         ops = sem_apply.load_operators()
-        stats = sem_apply.apply_to_operators(ops, use_llm=args.llm)
+        stats = sem_apply.apply_to_operators(
+            ops, use_llm=args.llm, mode=getattr(args, "llm_mode", "gaps"),
+            limit=getattr(args, "llm_limit", None), cfg=cfg)
         sem_apply.save_operators(ops)
         sem_apply.write_semantics_report(ops, stats)
+        if stats.get("llm_enabled"):
+            print(f"[build] LLM 复核：{sem_apply.write_llm_review(ops, stats, cfg)}")
     try:
         from .data import mechanics
         mechanics.write_report()
@@ -218,10 +231,11 @@ def cmd_explain(args) -> int:
 
 
 def cmd_update(args) -> int:
-    """一条命令更新游戏数据：sync → build → 数据自检。
+    """一条命令更新游戏数据：sync → build（可带 LLM 复核）→ 自检。
 
-    适用于"游戏出了新版本/新干员/新装备"之后：
-      python run.py update
+    适用于"游戏出了新版本/新干员/新干员新装备"之后：
+      python run.py update            # 只跑规则
+      python run.py update --llm      # 规则 + LLM 复核（需先配置 API）
     失败不覆盖：sync 失败会直接停止，保留上一版数据集。
     """
     from argparse import Namespace
@@ -232,10 +246,94 @@ def cmd_update(args) -> int:
         print("[update] 同步失败，保留现有数据集")
         return rc
     print("[update] 2/2 重建数据集…")
-    rc = cmd_build(Namespace(force=False, no_semantics=False, llm=False))
+    rc = cmd_build(Namespace(force=False, no_semantics=False,
+                             llm=bool(getattr(args, "llm", False)),
+                             llm_mode=getattr(args, "llm_mode", "gaps"),
+                             llm_limit=getattr(args, "llm_limit", None)))
     if rc != 0:
         return rc
-    print("[update] 完成。报告见 data/reports/（coverage / data-quality / drift）")
+    print("[update] 完成。报告见 data/reports/"
+          "（coverage / data-quality / semantics / llm-review）")
+    return 0
+
+
+def cmd_llm(args) -> int:
+    """配置 / 测试 / 运行 LLM 复核。"""
+    from .semantics import apply as sem_apply
+    from .semantics import llm, llm_config
+
+    patch = {}
+    if args.base:
+        patch["base"] = args.base
+    if args.model:
+        patch["model"] = args.model
+    if args.key:
+        patch["key"] = args.key
+    if args.enable:
+        patch["enabled"] = True
+    if args.disable:
+        patch["enabled"] = False
+    if patch:
+        try:
+            cfg = llm_config.save(patch)
+        except ValueError as e:
+            print(f"[llm] 配置无效：{e}")
+            return 2
+        print(f"[llm] 已保存：{llm_config.public(cfg)['base']} / "
+              f"{cfg['model']} / key={llm_config.mask_key(cfg['key']) or '（空）'} / "
+              f"{'启用' if cfg['enabled'] else '停用'}")
+
+    if args.clear_cache:
+        print(f"[llm] 已清理 {llm.clear_cache()} 条缓存")
+
+    cfg = llm_config.load()
+    if args.test:
+        res = llm.test_connection(cfg)
+        if res.get("ok"):
+            print(f"[llm] 连接成功：{res.get('model')} · {res.get('latency_ms')}ms "
+                  f"· tokens={res.get('usage')}")
+            return 0
+        print(f"[llm] 连接失败：{res.get('error')}")
+        return 3
+
+    if not args.apply:
+        print(llm.describe())
+        print(f"  配置文件：{llm_config.path()}")
+        return 0
+
+    ops = sem_apply.load_operators()
+    if not ops:
+        print("[llm] 没有数据集，先运行 build")
+        return 1
+    if not llm_config.available(cfg):
+        print("[llm] 未配置 API（需要 enabled + key）。先执行：")
+        print("  python run.py llm --base https://api.deepseek.com/v1 "
+              "--model deepseek-chat --key sk-xxx --enable")
+        return 2
+    stats = sem_apply.apply_to_operators(
+        ops, use_llm=True, mode=args.mode, limit=args.limit, cfg=cfg)
+    r1 = sem_apply.write_semantics_report(ops, stats)
+    r2 = sem_apply.write_llm_review(ops, stats, cfg)
+    if args.mechanics:
+        try:
+            from .data import quality
+            from .model import Dataset
+            items = quality.llm_items(Dataset.load(config.NORM))
+            if items:
+                rows = llm.classify_mechanics(items, cfg=cfg) or []
+                if rows:
+                    print(f"[llm] 机制归类：{quality.write_llm_mechanics(rows, cfg['model'])}")
+        except Exception as e:  # noqa: BLE001
+            print(f"[llm] 机制归类跳过：{type(e).__name__}: {e}")
+    if not args.dry_run:
+        sem_apply.save_operators(ops)
+        print("[llm] 已写回数据集")
+    else:
+        print("[llm] dry-run：报告已生成，未写回数据集")
+    print(f"[llm] 报告：{r1.name} / {r2.name}")
+    print(f"[llm] 采纳 {stats['llm_used']} · 拒绝 {stats['llm_rejected']} · "
+          f"缓存 {stats['llm_cache']} · tokens "
+          f"{stats['prompt_tokens']}+{stats['completion_tokens']}")
     return 0
 
 
@@ -275,6 +373,14 @@ def cmd_check(args) -> int:
         print(f"[check] 数据自检：{qp.name}（元素来源 / 兜底项 / 未建模属性）")
     except Exception as e:  # noqa: BLE001
         print(f"[check] 数据自检跳过：{type(e).__name__}")
+    try:
+        from .semantics import llm_config
+        pub = llm_config.public()
+        state = "可用" if llm_config.available() else "未配置"
+        print(f"[check] LLM：{state} · {pub['base']} · {pub['model']} · "
+              f"key={pub['key_masked'] or '（空）'}")
+    except Exception as e:  # noqa: BLE001
+        print(f"[check] LLM 状态读取失败：{type(e).__name__}")
     print(f"[check] 警告 {warn} 条；报告见 data/reports/")
     return 0 if warn == 0 or not args.strict else 3
 
@@ -349,10 +455,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--force", action="store_true")
     p.add_argument("--no-semantics", action="store_true")
     p.add_argument("--llm", action="store_true", help="启用 LLM 语义增强（需 API key）")
+    p.add_argument("--llm-mode", choices=["gaps", "all"], default="gaps")
+    p.add_argument("--llm-limit", type=int, default=None)
     p.set_defaults(func=cmd_build)
 
     p = sub.add_parser("semantics", help="重新抽取技能语义")
     p.add_argument("--llm", action="store_true")
+    p.add_argument("--llm-mode", choices=["gaps", "all"], default="gaps")
+    p.add_argument("--llm-limit", type=int, default=None)
     p.set_defaults(func=cmd_semantics)
 
     p = sub.add_parser("check", help="检查覆盖率/完整性")
@@ -360,7 +470,26 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(func=cmd_check)
 
     p = sub.add_parser("update", help="一条命令更新数据（sync → build → 自检）")
+    p.add_argument("--llm", action="store_true", help="重建后用 LLM 复核语义")
+    p.add_argument("--llm-mode", choices=["gaps", "all"], default="gaps")
+    p.add_argument("--llm-limit", type=int, default=None)
     p.set_defaults(func=cmd_update)
+
+    p = sub.add_parser("llm", help="配置/测试/运行 LLM 语义复核")
+    p.add_argument("--base", default=None, help="OpenAI 兼容接口（如 https://api.deepseek.com/v1）")
+    p.add_argument("--model", default=None)
+    p.add_argument("--key", default=None, help="API key（只存在本机 data/llm.json）")
+    p.add_argument("--enable", action="store_true")
+    p.add_argument("--disable", action="store_true")
+    p.add_argument("--test", action="store_true", help="测试连接")
+    p.add_argument("--apply", action="store_true", help="对当前数据集跑 LLM 复核")
+    p.add_argument("--mechanics", action="store_true",
+                   help="同时让 LLM 归类未建模的黑板 key（只写报告）")
+    p.add_argument("--mode", choices=["gaps", "all"], default="gaps")
+    p.add_argument("--limit", type=int, default=None)
+    p.add_argument("--dry-run", action="store_true", help="只出报告，不写回数据集")
+    p.add_argument("--clear-cache", action="store_true")
+    p.set_defaults(func=cmd_llm)
 
 
     p = sub.add_parser("axis", help="单队输出轴（冷/热启动）")

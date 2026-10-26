@@ -1,3 +1,3 @@
 """终末地配队模拟 · endfield package."""
 
-__version__ = "2.4.2"
+__version__ = "2.5.0"

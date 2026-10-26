@@ -32,6 +32,10 @@ ABNORMALS = ["燃烧", "导电", "冻结", "腐蚀", "击飞", "倒地", "猛击
 
 TARGETS = ["self", "team", "enemy", "area", "unknown"]
 
+ELEMENTS = ["物理", "灼热", "电磁", "寒冷", "自然", "超域", None]
+
+ROLES = ["damage", "heal", "buff", "utility", "unknown"]
+
 SEMANTICS_SCHEMA: dict[str, Any] = {
     "type": "object",
     "required": ["slot", "trigger", "confidence", "method"],
@@ -48,9 +52,10 @@ SEMANTICS_SCHEMA: dict[str, Any] = {
                 "window_s": {"type": ["number", "null"]},
             },
         },
-        "element": {"type": ["string", "null"]},
+        "element": {"enum": ELEMENTS},
         "abnormal": {"enum": ABNORMALS},
         "target": {"enum": TARGETS},
+        "role": {"enum": ROLES},
         "duration_s": {"type": ["number", "null"]},
         "is_dot": {"type": "boolean"},
         "needs_enemy_hit": {"type": "boolean"},
@@ -59,6 +64,7 @@ SEMANTICS_SCHEMA: dict[str, Any] = {
         "heals": {"type": "boolean"},
         "shields": {"type": "boolean"},
         "tags": {"type": "array", "items": {"type": "string"}},
+        "evidence": {"type": "array", "items": {"type": "string"}},
         "text_zh": {"type": ["string", "null"]},
         "confidence": {"type": "number", "minimum": 0, "maximum": 1},
         "method": {"enum": ["rule", "llm", "manual", "merged"]},
@@ -71,6 +77,8 @@ _ENUM = {
     "slot": SLOTS,
     "abnormal": ABNORMALS,
     "target": TARGETS,
+    "role": ROLES,
+    "element": ELEMENTS,
     "method": ["rule", "llm", "manual", "merged"],
 }
 
@@ -92,6 +100,10 @@ def validate_semantics(obj: dict) -> tuple[bool, list[str]]:
     for key in ("is_dot", "needs_enemy_hit", "heals", "shields"):
         if key in obj and not isinstance(obj[key], bool):
             errs.append(f"{key} not bool")
+    ev = obj.get("evidence")
+    if ev is not None and (not isinstance(ev, list)
+                           or any(not isinstance(x, str) for x in ev)):
+        errs.append("evidence must be array[str]")
     return (not errs), errs
 
 

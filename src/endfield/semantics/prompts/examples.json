@@ -1,0 +1,152 @@
+[
+  {
+    "input": {
+      "operator": "陈千语",
+      "slot": "battle_skill",
+      "name": "归穹宇",
+      "element_hint": "物理",
+      "text": "对目标敌人进行上挑攻击，造成物理伤害和击飞。"
+    },
+    "output": {
+      "slot": "battle_skill",
+      "trigger": "none",
+      "trigger_params": {"hp_below_pct": null, "requires_status": null, "window_s": null},
+      "element": "物理",
+      "abnormal": "击飞",
+      "target": "enemy",
+      "role": "damage",
+      "duration_s": null,
+      "is_dot": false,
+      "needs_enemy_hit": false,
+      "gives_sp": null,
+      "gives_ult": null,
+      "heals": false,
+      "shields": false,
+      "tags": ["上挑", "物理异常"],
+      "evidence": ["造成物理伤害和击飞"],
+      "confidence": 0.9,
+      "method": "llm",
+      "notes": []
+    }
+  },
+  {
+    "input": {
+      "operator": "余烬",
+      "slot": "combo_skill",
+      "name": "前线援护",
+      "element_hint": "物理",
+      "text": "主控干员受到攻击后可以发动。 向目标敌人跳起并重砸，造成物理伤害和倒地，同时治疗主控干员。意志可以额外提高治疗量。"
+    },
+    "output": {
+      "slot": "combo_skill",
+      "trigger": "on_hit_taken",
+      "trigger_params": {"hp_below_pct": null, "requires_status": null, "window_s": null},
+      "element": "物理",
+      "abnormal": "倒地",
+      "target": "enemy",
+      "role": "damage",
+      "duration_s": null,
+      "is_dot": false,
+      "needs_enemy_hit": true,
+      "gives_sp": null,
+      "gives_ult": null,
+      "heals": true,
+      "shields": false,
+      "tags": ["受击触发", "治疗"],
+      "evidence": ["主控干员受到攻击后可以发动", "造成物理伤害和倒地，同时治疗主控干员"],
+      "confidence": 0.95,
+      "method": "llm",
+      "notes": []
+    }
+  },
+  {
+    "input": {
+      "operator": "昼雪",
+      "slot": "battle_skill",
+      "name": "饱和性防御",
+      "element_hint": "寒冷",
+      "text": "架起盾牌格挡攻击，使自身及周围干员获得庇护，并立即返还一定技力。 若在立盾期间受到攻击，则发动一次反击，尝试对攻击者造成寒冷伤害，并施加寒冷附着。"
+    },
+    "output": {
+      "slot": "battle_skill",
+      "trigger": "none",
+      "trigger_params": {"hp_below_pct": null, "requires_status": null, "window_s": null},
+      "element": "寒冷",
+      "abnormal": "附着",
+      "target": "team",
+      "role": "buff",
+      "duration_s": null,
+      "is_dot": false,
+      "needs_enemy_hit": true,
+      "gives_sp": null,
+      "gives_ult": null,
+      "heals": false,
+      "shields": true,
+      "tags": ["格挡", "反击", "寒冷附着"],
+      "evidence": ["架起盾牌格挡攻击", "若在立盾期间受到攻击", "造成寒冷伤害，并施加寒冷附着"],
+      "confidence": 0.9,
+      "method": "llm",
+      "notes": ["触发条件与 needs_enemy_hit 分离：战技本身随时可放"]
+    }
+  },
+  {
+    "input": {
+      "operator": "埃特拉",
+      "slot": "combo_skill",
+      "name": "失真",
+      "element_hint": "物理",
+      "text": "当有敌人进入冻结状态时可以发动。 迅速移动到敌人身边，对小范围内的敌人造成物理伤害并强制造成击飞。如果命中处于冻结状态的敌人，还会造成额外伤害并施加物理脆弱。"
+    },
+    "output": {
+      "slot": "combo_skill",
+      "trigger": "on_status",
+      "trigger_params": {"hp_below_pct": null, "requires_status": "冻结", "window_s": null},
+      "element": "物理",
+      "abnormal": "击飞",
+      "target": "area",
+      "role": "damage",
+      "duration_s": null,
+      "is_dot": false,
+      "needs_enemy_hit": false,
+      "gives_sp": null,
+      "gives_ult": null,
+      "heals": false,
+      "shields": false,
+      "tags": ["状态触发", "物理脆弱"],
+      "evidence": ["当有敌人进入冻结状态时可以发动", "造成物理伤害并强制造成击飞"],
+      "confidence": 0.9,
+      "method": "llm",
+      "notes": []
+    }
+  },
+  {
+    "input": {
+      "operator": "某干员",
+      "slot": "combo_skill",
+      "name": "",
+      "element_hint": null,
+      "text": ""
+    },
+    "output": {
+      "slot": "combo_skill",
+      "trigger": "unknown",
+      "trigger_params": {"hp_below_pct": null, "requires_status": null, "window_s": null},
+      "element": null,
+      "abnormal": null,
+      "target": "unknown",
+      "role": "unknown",
+      "duration_s": null,
+      "is_dot": false,
+      "needs_enemy_hit": false,
+      "gives_sp": null,
+      "gives_ult": null,
+      "heals": false,
+      "shields": false,
+      "tags": [],
+      "evidence": [],
+      "confidence": 0.2,
+      "method": "llm",
+      "notes": ["无描述文本"]
+    }
+  }
+]
