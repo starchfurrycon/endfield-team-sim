@@ -288,29 +288,53 @@ class Battle:
 
     def _apply_hit(self, item: dict) -> None:
         cid = item["cid"]
-        dmg = item["dmg"]
-        poise = item["poise"]
         element = item["element"]
         frame = item["frame"]
         abnormal = item.get("abnormal")
 
+        flat = item.get("flat")
+        if flat:
+            self.total_damage += flat
+            self.per_op[cid] = self.per_op.get(cid, 0.0) + flat
+            self.log.append({"frame": frame, "kind": "dot", "op": cid,
+                             "label": f"{self.ops[cid].name_zh}·{item.get('label')}",
+                             "damage": flat})
+            return
+
+        # ---- 基础伤害在"命中瞬间"计算：抗性/易伤/失衡/导电都随状态变化
+        if not item.get("no_rx"):
+            dmg = self._hit_damage(cid, item["mult"], element, frame)
+        else:
+            dmg = self._hit_damage(cid, item["mult"], element, frame,
+                                   apply_status=False)
         if dmg > 0:
             self.total_damage += dmg
             self.per_op[cid] = self.per_op.get(cid, 0.0) + dmg
 
         # ---- 元素 / 物理异常（附加伤害，属于施放者）
+        if item.get("no_rx"):
+            return
+        atk = self._atk(cid)
+        ai = self._ai(cid)
         bonus = 0.0
-        if item.get("applies_element", True) and element in rxmod.ARTS_ELEMENTS:
-            bonus, event = self.rx.apply_element(
-                element, self._atk(cid), frame, self.sc.level)
-        elif item.get("applies_element", True) and abnormal:
+        event = None
+        followups: list[tuple[int, float, str]] = []
+        applies = item.get("applies_element", True)
+        if applies and element in rxmod.ARTS_ELEMENTS:
+            bonus, event, followups = self.rx.apply_element(
+                element, atk, frame, self.sc.level, ai)
+        elif applies and abnormal:
             bonus, event = self.rx.apply_physical(
-                abnormal, self._atk(cid), frame, self.sc.level)
-        else:
-            event = None
+                abnormal, atk, frame, self.sc.level, ai)
+            # 冻结时被物理异常击碎 → 碎冰
+            if self.rx.is_frozen(frame):
+                sd, sev = self.rx.consume_frozen(frame, atk, self.sc.level, ai)
+                if sd > 0:
+                    bonus += sd
+                    event = f"{event}+{sev}" if event else sev
+
         if bonus:
-            staged = self.staggered_until > frame
-            if staged:
+            if self.staggered_until > frame:
                 bonus *= config.guess("STAGGER_DMG_MULT")
             bonus = round(bonus)
             self.total_damage += bonus
@@ -323,7 +347,15 @@ class Battle:
                 "label": f"{self.ops[cid].name_zh}·{event}",
                 "damage": round(bonus, 1),
             })
+        for delay, d, label in followups:
+            self.pending.append({
+                "frame": frame + int(delay), "cid": cid, "mult": 0.0,
+                "poise": 0.0, "element": None, "slot": "dot",
+                "abnormal": None, "applies_element": False, "no_rx": True,
+                "flat": round(d), "label": label,
+            })
 
+        poise = item["poise"]
         if poise > 0:
             self.enemy_poise += poise
             if self.enemy_poise >= self.sc.enemy_poise:
@@ -332,6 +364,28 @@ class Battle:
                 self._open_windows_for("on_break", frame)
                 self.log.append({"frame": frame, "kind": "stagger", "op": None,
                                  "label": "敌人失衡", "damage": 0.0})
+
+    def _ai(self, cid: str) -> float:
+        """源石技艺强度（attrType 87）。"""
+        row = self.ops[cid].stat_at(self.sc.level)
+        return float(row.get("arts_intensity") or 0.0)
+
+    def _hit_damage(self, cid: str, mult: float, element: str | None,
+                    frame: int, *, apply_status: bool = True) -> float:
+        if mult <= 0:
+            return 0.0
+        atk = self._atk(cid)
+        res = self.sc.enemy_res
+        if apply_status:
+            res = max(0.0, res - self.rx.res_shred(frame) / 100.0)
+        d = atk * mult
+        d *= 100.0 / (max(0.0, self.sc.enemy_def) + 100.0)
+        d *= max(0.0, 1.0 - res)
+        if self.staggered_until > frame:
+            d *= config.guess("STAGGER_DMG_MULT")
+        if apply_status and element in rxmod.ARTS_ELEMENTS:
+            d *= self.rx.arts_dmg_taken(frame)
+        return round(d)
 
     # ------------------------------------------------------------ 合法动作
 
@@ -468,14 +522,8 @@ class Battle:
         poise_share = float(lv.multipliers.get("poise") or 0.0) / n
         for hf in hits:
             frame = start + int(hf)
-            d, _zones = dmgmod.compute(dmgmod.DamageContext(
-                atk=atk, multiplier=share, element=element,
-                skill_slot=sk.slot,
-                staggered=self.staggered_until > frame,
-                enemy_def=self.sc.enemy_def, enemy_res=self.sc.enemy_res,
-            ))
             self.pending.append({
-                "frame": frame, "cid": cid, "dmg": float(d),
+                "frame": frame, "cid": cid, "mult": share,
                 "poise": poise_share, "element": element,
                 "slot": sk.slot,
                 "abnormal": (sk.semantics or {}).get("abnormal"),

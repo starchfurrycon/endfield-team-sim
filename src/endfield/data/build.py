@@ -25,6 +25,7 @@ _STAT_IDS = {
     1: "max_hp", 2: "atk", 3: "def",
     39: "str", 40: "agi", 41: "wisd", 42: "will",
     9: "crit_rate", 10: "crit_dmg",
+    87: "arts_intensity",   # 源石技艺强度
 }
 
 _WEAPON_NAME = {

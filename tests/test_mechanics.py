@@ -22,7 +22,7 @@ def _ds() -> Dataset:
 class TestArtsReactions(unittest.TestCase):
     def test_first_hit_attaches_only(self):
         s = rx.ReactionState()
-        dmg, ev = s.apply_element("灼热", atk=1000, frame=0, level=80)
+        dmg, ev, _ = s.apply_element("灼热", atk=1000, frame=0, level=80)
         self.assertEqual(dmg, 0.0)
         self.assertEqual(ev, "附着")
         self.assertEqual(s.arts_stacks, 1)
@@ -30,27 +30,27 @@ class TestArtsReactions(unittest.TestCase):
     def test_same_element_bursts(self):
         s = rx.ReactionState()
         s.apply_element("寒冷", 1000, 0, 80)
-        dmg, ev = s.apply_element("寒冷", 1000, 10, 80)
+        dmg, ev, _ = s.apply_element("寒冷", 1000, 10, 80)
         self.assertEqual(ev, "爆发")
         self.assertGreater(dmg, 0)
 
     def test_different_element_reaction_scales_with_stacks(self):
         a = rx.ReactionState()
         a.apply_element("灼热", 1000, 0, 80)
-        d1, e1 = a.apply_element("电磁", 1000, 10, 80)
+        d1, e1, _ = a.apply_element("电磁", 1000, 10, 80)
 
         b = rx.ReactionState()
         b.apply_element("灼热", 1000, 0, 80)
         b.apply_element("灼热", 1000, 5, 80)
         b.apply_element("灼热", 1000, 6, 80)
-        d2, e2 = b.apply_element("电磁", 1000, 10, 80)
-        self.assertEqual(e1, "异常")
-        self.assertEqual(e2, "异常")
+        d2, e2, _ = b.apply_element("电磁", 1000, 10, 80)
+        self.assertEqual(e1, "导电")   # 电磁触发 → 导电
+        self.assertEqual(e2, "导电")
         self.assertGreater(d2, d1, "附着层数越多，异常伤害越高")
 
     def test_physical_is_element_agnostic(self):
         s = rx.ReactionState()
-        self.assertEqual(s.apply_element("物理", 1000, 0, 80), (0.0, None))
+        self.assertEqual(s.apply_element("物理", 1000, 0, 80), (0.0, None, []))
 
 
 class TestPhysicalReactions(unittest.TestCase):
@@ -74,14 +74,14 @@ class TestPhysicalReactions(unittest.TestCase):
         self.assertGreater(dmg, 0)
 
     def test_breach_weaker_than_crush(self):
-        s1 = rx.ReactionState(vuln=3)
+        s1 = rx.ReactionState(vuln=3, vuln_until=10**9)
         d_crush, _ = s1.apply_physical("猛击", 1000, 0, 80)
-        s2 = rx.ReactionState(vuln=3)
+        s2 = rx.ReactionState(vuln=3, vuln_until=10**9)
         d_breach, _ = s2.apply_physical("碎甲", 1000, 0, 80)
         self.assertGreater(d_crush, d_breach)
 
     def test_vulnerable_capped(self):
-        s = rx.ReactionState(vuln=rx.MAX_VULN)
+        s = rx.ReactionState(vuln=rx.MAX_VULN, vuln_until=10**9)
         s.apply_physical("击飞", 1000, 0, 80)
         self.assertEqual(s.vuln, rx.MAX_VULN)
 
@@ -167,3 +167,81 @@ class TestReactionIntegration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestArtsStatuses(unittest.TestCase):
+    """状态等级 I~IV、燃烧 DoT、腐蚀减抗、导电增伤、附着实效。"""
+
+    def test_status_level_equals_consumed_stacks(self):
+        for stacks in (1, 2, 3, 4):
+            s = rx.ReactionState()
+            for i in range(stacks):
+                s.apply_element("灼热", 1000, i, 80)
+            dmg, kind, fu = s.apply_element("电磁", 1000, 100, 80)
+            self.assertEqual(kind, "导电")
+            self.assertEqual(s.statuses["导电"]["level"], stacks)
+            self.assertEqual(len(fu), 0)      # 导电没有 DoT
+
+    def test_combustion_dot_ticks(self):
+        s = rx.ReactionState()
+        s.apply_element("寒冷", 1000, 0, 80)      # 先铺寒冷
+        for i in range(1, 4):
+            s.apply_element("寒冷", 1000, i, 80)
+        dmg, kind, fu = s.apply_element("灼热", 1000, 100, 80)   # 灼热 → 燃烧
+        self.assertEqual(kind, "燃烧")
+        self.assertEqual(len(fu), 10, "燃烧 10 秒每秒一跳")
+        self.assertTrue(all(d > 0 for _, d, _ in fu))
+        self.assertTrue(all(lb == "燃烧" for _, _, lb in fu))
+
+    def test_corrosion_res_shred_ramps_and_caps(self):
+        s = rx.ReactionState()
+        s.apply_element("自然", 1000, 0, 80)
+        for i in range(1, 4):
+            s.apply_element("自然", 1000, i, 80)
+        s.apply_element("灼热", 1000, 100, 80)   # 灼热 → 燃烧而不是腐蚀
+        s2 = rx.ReactionState()
+        s2.apply_element("灼热", 1000, 0, 80)
+        for i in range(1, 4):
+            s2.apply_element("灼热", 1000, i, 80)
+        dmg, kind, _ = s2.apply_element("自然", 1000, 100, 80)
+        self.assertEqual(kind, "腐蚀")
+        early = s2.res_shred(100)
+        later = s2.res_shred(100 + 10 * 30)
+        self.assertGreater(later, early)
+        self.assertLessEqual(later, 12.0 * 4)
+
+    def test_electrification_boost_expires(self):
+        s = rx.ReactionState()
+        s.apply_element("灼热", 1000, 0, 80)
+        for i in range(1, 4):
+            s.apply_element("灼热", 1000, i, 80)
+        s.apply_element("电磁", 1000, 100, 80)
+        self.assertGreater(s.arts_dmg_taken(110), 1.0)
+        self.assertEqual(s.arts_dmg_taken(100 + rx.ELECTRIFICATION_FRAMES + 10), 1.0)
+
+    def test_infliction_expires_after_20s(self):
+        s = rx.ReactionState()
+        s.apply_element("寒冷", 1000, 0, 80)
+        self.assertEqual(s.arts_stacks, 1)
+        # 超过 20 秒后再次附着，应重新从 1 层开始
+        dmg, kind, _ = s.apply_element("寒冷", 1000, rx.INFLICTION_FRAMES + 1, 80)
+        self.assertEqual(kind, "附着")
+        self.assertEqual(s.arts_stacks, 1)
+
+    def test_arts_intensity_scales_damage(self):
+        a = rx.ReactionState()
+        a.apply_element("灼热", 1000, 0, 80, ai=0)
+        d0, _, _ = a.apply_element("电磁", 1000, 100, 80, ai=0)
+        b = rx.ReactionState()
+        b.apply_element("灼热", 1000, 0, 80, ai=100)
+        d1, _, _ = b.apply_element("电磁", 1000, 100, 80, ai=100)
+        self.assertAlmostEqual(d1 / d0, 2.0, places=2)
+
+    def test_shatter_on_frozen(self):
+        s = rx.ReactionState()
+        s.apply_element("自然", 1000, 0, 80)
+        s.apply_element("寒冷", 1000, 10, 80)     # 冻结
+        self.assertTrue(s.is_frozen(20))
+        dmg, ev = s.consume_frozen(20, 1000, 80)
+        self.assertGreater(dmg, 0)
+        self.assertEqual(ev, "碎冰")
+        self.assertFalse(s.is_frozen(20))
