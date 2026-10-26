@@ -7,7 +7,7 @@
 ### 改名
 
 - 软件名 / 窗口标题 / 项目名：**随心配（Suixinpei）**；
-- 可执行文件 `随心配.exe`，发行包 `随心配-3.1.0-win64.zip`，仓库 `starchfurrycon/suixinpei`；
+- 可执行文件 `随心配.exe`，发行包 `suixinpei-3.1.0-win64.zip`，仓库 `starchfurrycon/suixinpei`；
 - 内部服务名与数据格式不变（`endfield-server.exe` / `data/`），老用户直接替换程序即可。
 
 ### 界面（这次按终末地官网的设计语言）

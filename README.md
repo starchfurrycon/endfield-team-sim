@@ -26,7 +26,7 @@
 
 ### 方式 A：下载桌面版（推荐）
 
-从 Releases 下载 `随心配-3.1.0-win64.zip`，解压后双击：
+从 Releases 下载 `suixinpei-3.1.0-win64.zip`，解压后双击：
 
 ```
 随心配.exe
