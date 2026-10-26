@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import copy
 import heapq
+import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -48,6 +49,8 @@ class Scenario:
     # 主控以外的干员会自动普攻（游戏内教学页 wiki_tut_bat_team_1）
     offfield_auto_attack: bool = True
     potential_level: int = 0      # 潜能等级 0~5（默认不点）
+    equip_ids: list[str] = field(default_factory=list)   # 4 件装备（默认空）
+    equip_level: int = 3          # 精锻等级 0~3
     talent_level: int = 3         # 天赋阶段（取数据里可用的最高阶）
 
     def to_dict(self) -> dict:
@@ -134,6 +137,7 @@ class Battle:
         self.pending: list[dict] = []
         self.rx = rxmod.ReactionState()
         self.mod = self._build_mods()
+        self._apply_equipment()
         self.log: list[dict] = []
         self.issues: list[str] = []
         self.counters: dict[str, int] = {}
@@ -389,6 +393,58 @@ class Battle:
     _ATTR_MAIN = {39: "str", 40: "agi", 41: "wisd", 42: "will"}
     _ATTR_DMG = {17, 28, 29, 32, 33, 50, 51, 52, 53, 54, 55, 61,
                  64, 65, 66, 67, 68, 69}
+
+
+    _EQUIP_CACHE: dict | None = None
+
+    @classmethod
+    def _equip_table(cls) -> dict:
+        if Battle._EQUIP_CACHE is None:
+            p = config.NORM / "equip.json"
+            try:
+                Battle._EQUIP_CACHE = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                Battle._EQUIP_CACHE = {"items": {}, "suits": {}}
+        return Battle._EQUIP_CACHE
+
+    def _apply_equipment(self) -> None:
+        """把 4 件装备的属性（按精锻等级）加到每个干员身上。
+
+        默认 equip_ids 为空 = 不穿装备，行为与之前完全一致。
+        """
+        ids = list(self.sc.equip_ids or [])
+        if not ids:
+            return
+        table = (self._equip_table().get("items") or {})
+        lv = max(0, min(int(self.sc.equip_level), 3))
+        acc: dict[str, float] = {}
+        for iid in ids:
+            row = table.get(iid) or {}
+            for attr, vals in (row.get("attrs") or {}).items():
+                if not vals:
+                    continue
+                v = float(vals[min(lv, len(vals) - 1)] or 0.0)
+                if v:
+                    acc[attr] = acc.get(attr, 0.0) + v
+        if not acc:
+            return
+        for cid in self.ids:
+            m = self.mod[cid]
+            for attr, v in acc.items():
+                try:
+                    a = int(attr)
+                except ValueError:
+                    continue
+                if a in self._ATTR_MAIN:
+                    k = self._ATTR_MAIN[a]
+                    m["attrs"][k] = m["attrs"].get(k, 0.0) + v
+                elif a == 87:
+                    m["ai"] += v
+                elif a in self._ATTR_DMG:
+                    m["dmg_bonus"] += v
+                else:
+                    continue
+                m["applied"].append(f"EQ:{attr}+{v:g}")
 
     def _build_mods(self) -> dict:
         """把天赋/潜能里**无条件**的数值修正整理成 {cid: {...}}。

@@ -225,6 +225,42 @@ class TestBlackboardMods(unittest.TestCase):
         self.assertAlmostEqual(b0._scaled_mult(cid, sk), sk.total_multiplier(7), places=4)
 
 
+class TestEquipment(unittest.TestCase):
+    """装备：EquipTable 的属性向量按精锻等级累加。"""
+
+    @classmethod
+    def setUpClass(cls):
+        import json as _json
+        cls.ds = _ds()
+        p = config.NORM / "equip.json"
+        cls.equip = _json.loads(p.read_text(encoding="utf-8"))
+        cls.op = cls.ds.resolve("陈千语")
+        cls.piece = next(iter(cls.equip["items"]))
+
+    def test_index_present(self):
+        self.assertGreater(len(self.equip["items"]), 100)
+        self.assertGreater(len(self.equip["suits"]), 10)
+
+    def test_equip_raises_atk(self):
+        cid = self.op.char_id
+        b0 = Battle(self.ds, Scenario(team=[cid]))
+        b1 = Battle(self.ds, Scenario(team=[cid], equip_ids=[self.piece]))
+        self.assertGreaterEqual(b1._atk(cid), b0._atk(cid))
+
+    def test_equip_level_scales(self):
+        cid = self.op.char_id
+        b_low = Battle(self.ds, Scenario(team=[cid], equip_ids=[self.piece],
+                                         equip_level=0))
+        b_high = Battle(self.ds, Scenario(team=[cid], equip_ids=[self.piece],
+                                          equip_level=3))
+        self.assertGreaterEqual(b_high._atk(cid), b_low._atk(cid))
+
+    def test_default_has_no_equipment(self):
+        cid = self.op.char_id
+        b = Battle(self.ds, Scenario(team=[cid]))
+        self.assertEqual(b.mod[cid]["applied"], [])
+
+
 if __name__ == "__main__":
     unittest.main()
 

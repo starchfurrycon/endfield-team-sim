@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.4.0 (2026-10-26)
+
+接入**装备**（EquipTable / EquipSuitTable）。
+
+### 新增
+
+- `build` 导出 `data/normalized/equip.json`：276 件装备的属性向量（精锻 0~3）+ 24 套套装
+- `Scenario.equip_ids`（4 件）与 `Scenario.equip_level`（0~3）
+- 装备属性按 `attrType` 并入与天赋相同的修正通道（主属性 / 伤害加成 / 源石技艺强度）
+- **默认空装备**：不传就是旧行为，不会悄悄改变已有结果
+
+示例：陈千语只穿一件 `t0_parts_tundra01_body_01`（力量+15、敏捷+10）→ ATK 1021 → 1063。
+
+### 未做
+
+- 套装 3 件效果的被动技能（`passive_equipsuit_*`）还没解析进 BuffData 通道
+- 精锻的随机副词条不建模（只有固定主属性）
+
+### 测试
+
+61 项（新增 4 项：索引存在、装备提升 ATK、精锻等级单调、默认不穿装备）。
+
+
 ## v1.3.0 (2026-10-26)
 
 把潜能/天赋里的**技能黑板修正**（`skillBbModifier`）接入模型。

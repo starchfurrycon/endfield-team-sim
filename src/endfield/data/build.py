@@ -475,6 +475,29 @@ def build(force: bool = False, verbose: bool = True) -> dict:
     (config.NORM / "dataset.json").write_text(
         json.dumps(dataset, ensure_ascii=False, indent=1), encoding="utf-8")
 
+    # ---- 装备索引（属性向量 + 套装）
+    try:
+        eq = src.table("EquipTable.json") or {}
+        suits = src.table("EquipSuitTable.json") or {}
+        equip_index = {}
+        for iid, row in eq.items():
+            attrs = {}
+            for m in row.get("equipAttrModifiers") or []:
+                vals = m.get("attrValues") or []
+                if not vals:
+                    continue
+                key = str(m.get("attrType"))
+                attrs[key] = [float(v or 0.0) for v in vals[:4]]
+            equip_index[iid] = {"attrs": attrs}
+        suit_index = {sid: {"pieces": (v.get("equipList") or [])[:12]}
+                      for sid, v in suits.items()}
+        (config.NORM / "equip.json").write_text(
+            json.dumps({"items": equip_index, "suits": suit_index},
+                       ensure_ascii=False), encoding="utf-8")
+    except Exception as e:  # noqa: BLE001
+        if verbose:
+            print(f"[build] 装备索引跳过：{type(e).__name__}")
+
     manifest = {
         "version": version,
         "built_at": dataset["created_at"],
