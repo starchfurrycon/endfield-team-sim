@@ -30,10 +30,11 @@ NORM = DATA / "normalized"
 REPORTS = DATA / "reports"
 EXPORTS = APP_HOME / "exports"
 LLM_CACHE = DATA / "llm"
+AVATARS = DATA / "avatars"
 
 
 def ensure_dirs() -> None:
-    for p in (RAW, NORM, REPORTS, LLM_CACHE):
+    for p in (RAW, NORM, REPORTS, LLM_CACHE, AVATARS):
         p.mkdir(parents=True, exist_ok=True)
 
 

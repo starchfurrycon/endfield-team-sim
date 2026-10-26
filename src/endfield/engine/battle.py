@@ -117,6 +117,8 @@ class Battle:
     def __init__(self, ds: Dataset, sc: Scenario):
         self.ds = ds
         self.sc = sc
+        # 属性元数据（id → icon/name）：新属性靠它归类，见 _attr_category
+        self.attr_meta: dict = ((ds.constants or {}).get("attr_meta") or {})
         self.ids: list[str] = list(sc.team)
         self.ops: dict[str, Operator] = {}
         for cid in self.ids:
@@ -471,6 +473,48 @@ class Battle:
                 "heal_bonus": 0.0,        # 治疗量加成（不参与伤害）
                 "ai": 0.0, "bb": [], "applied": [], "ignored_attrs": []}
 
+    # 新属性 id 的兜底归类：AttributeMetaTable.iconName 的命名是稳定的，
+    # 新版本加属性时通常还能对上（对不上的会进 ignored_attrs，不会被当成通用增伤）。
+    _ICON_RULES = (
+        ("physical_damage_increase", ("element", "物理")),
+        ("fire_damage_increase", ("element", "灼热")),
+        ("pulse_damage_increase", ("element", "电磁")),
+        ("cryst_damage_increase", ("element", "寒冷")),
+        ("natural_damage_increase", ("element", "自然")),
+        ("ether_damage_increase", ("element", "超域")),
+        ("normal_attack_efficiency", ("slots", ("normal_attack", "power_attack", "dash_attack"))),
+        ("normal_atk_efficiency", ("slots", ("normal_attack", "power_attack", "dash_attack"))),
+        ("normal_skill_efficiency", ("slots", ("battle_skill",))),
+        ("combo_skill_efficiency", ("slots", ("combo_skill",))),
+        ("ultimate_skill_efficiency", ("slots", ("ultimate",))),
+        ("heal_output_increase", ("heal", None)),
+        ("damage_to_broken_unit", ("stagger", None)),
+    )
+
+    def _attr_category(self, a: int):
+        """返回 (类别, 参数)。已知 id 优先；未知 id 用 iconName 归类。"""
+        if a in self._ATTR_MAIN:
+            return "main", self._ATTR_MAIN[a]
+        if a == 87:
+            return "ai", None
+        if a == 2:
+            return "atk_flat", None
+        if a in self._ATTR_SLOT:
+            return "slots", self._ATTR_SLOT[a]
+        if a in self._ATTR_ELEMENT:
+            return "element", self._ATTR_ELEMENT[a]
+        if a == 61:
+            return "stagger", None
+        if a == 29:
+            return "heal", None
+        if a in (1, 3, 4, 5, 6, 7, 44, 48, 60):
+            return "skip", None
+        icon = str(((self.attr_meta or {}).get(str(a)) or {}).get("icon") or "").lower()
+        for pat, cat in self._ICON_RULES:
+            if pat in icon:
+                return cat
+        return None
+
     def _add_mod_attr(self, m: dict, a, v: float, tag: str) -> None:
         """按属性 id 把数值放进对应的乘区（不再一律塞进通用伤害加成）。"""
         try:
@@ -479,35 +523,35 @@ class Battle:
             return
         if not v:
             return
-        if a in self._ATTR_MAIN:
-            k = self._ATTR_MAIN[a]
-            m["attrs"][k] = m["attrs"].get(k, 0.0) + v
-            m["applied"].append(f"{tag}:{k}+{v:g}")
-        elif a == 87:
+        cat = self._attr_category(a)
+        if cat is None:
+            # 未定性属性：宁可不用，也不当成通用增伤
+            m["ignored_attrs"].append(a)
+            return
+        kind, arg = cat
+        if kind == "main":
+            m["attrs"][arg] = m["attrs"].get(arg, 0.0) + v
+            m["applied"].append(f"{tag}:{arg}+{v:g}")
+        elif kind == "ai":
             m["ai"] += v
             m["applied"].append(f"{tag}:AI+{v:g}")
-        elif a == 2:                       # 攻击力（固定值）
+        elif kind == "atk_flat":
             m["atk_flat"] += v
             m["applied"].append(f"{tag}:ATK+{v:g}")
-        elif a in self._ATTR_SLOT:
-            for slot in self._ATTR_SLOT[a]:
+        elif kind == "slots":
+            for slot in arg:
                 m["dmg_slot"][slot] = m["dmg_slot"].get(slot, 0.0) + v
-            m["applied"].append(f"{tag}:{self._ATTR_SLOT[a][0]}+{v:.1%}")
-        elif a in self._ATTR_ELEMENT:
-            el = self._ATTR_ELEMENT[a]
-            m["dmg_element"][el] = m["dmg_element"].get(el, 0.0) + v
-            m["applied"].append(f"{tag}:{el}+{v:.1%}")
-        elif a == 61:
+            m["applied"].append(f"{tag}:{arg[0]}+{v:.1%}")
+        elif kind == "element":
+            m["dmg_element"][arg] = m["dmg_element"].get(arg, 0.0) + v
+            m["applied"].append(f"{tag}:{arg}+{v:.1%}")
+        elif kind == "stagger":
             m["dmg_stagger"] += v
             m["applied"].append(f"{tag}:失衡+{v:.1%}")
-        elif a == 29:
+        elif kind == "heal":
             m["heal_bonus"] += v
-        elif a in (1, 3, 4, 5, 6, 7, 44, 48, 60):
-            # 生命/防御/受击减免/能量获取效率：不参与伤害公式（也不做生存模拟）
+        elif kind == "skip":
             return
-        else:
-            # 64~69 等未定性属性：宁可不用，也不当成通用增伤
-            m["ignored_attrs"].append(a)
 
 
     _EQUIP_CACHE: dict | None = None

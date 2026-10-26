@@ -63,7 +63,7 @@ def cmd_build(args) -> int:
     dataset = json.loads((config.NORM / "dataset.json").read_text(encoding="utf-8"))
     p1 = cov_mod.write_coverage(dataset, manifest)
     p2 = cov_mod.write_drift(prev, manifest)
-    print(f"[build] 报告：{p1.name}, {p2.name}")
+    print(f"[build] 报告：{p1.name}, {p2.name}, data-quality.md")
 
     if not args.no_semantics:
         from .semantics import apply as sem_apply
@@ -217,6 +217,28 @@ def cmd_explain(args) -> int:
     return 0
 
 
+def cmd_update(args) -> int:
+    """一条命令更新游戏数据：sync → build → 数据自检。
+
+    适用于"游戏出了新版本/新干员/新装备"之后：
+      python run.py update
+    失败不覆盖：sync 失败会直接停止，保留上一版数据集。
+    """
+    from argparse import Namespace
+
+    print("[update] 1/2 同步数据源…")
+    rc = cmd_sync(Namespace(force=False, strict=False))
+    if rc != 0:
+        print("[update] 同步失败，保留现有数据集")
+        return rc
+    print("[update] 2/2 重建数据集…")
+    rc = cmd_build(Namespace(force=False, no_semantics=False, llm=False))
+    if rc != 0:
+        return rc
+    print("[update] 完成。报告见 data/reports/（coverage / data-quality / drift）")
+    return 0
+
+
 def cmd_check(args) -> int:
     p = config.NORM / "dataset.json"
     if not p.exists():
@@ -245,6 +267,14 @@ def cmd_check(args) -> int:
                 warn += 1
     cp = cov_mod.write_constants()
     print(f"[check] 常量来源表：{cp}")
+    qp = None
+    try:
+        from .data import quality
+        from .model import Dataset
+        qp = quality.write_report(Dataset.load(config.NORM))
+        print(f"[check] 数据自检：{qp.name}（元素来源 / 兜底项 / 未建模属性）")
+    except Exception as e:  # noqa: BLE001
+        print(f"[check] 数据自检跳过：{type(e).__name__}")
     print(f"[check] 警告 {warn} 条；报告见 data/reports/")
     return 0 if warn == 0 or not args.strict else 3
 
@@ -328,6 +358,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("check", help="检查覆盖率/完整性")
     p.add_argument("--strict", action="store_true")
     p.set_defaults(func=cmd_check)
+
+    p = sub.add_parser("update", help="一条命令更新数据（sync → build → 自检）")
+    p.set_defaults(func=cmd_update)
 
 
     p = sub.add_parser("axis", help="单队输出轴（冷/热启动）")

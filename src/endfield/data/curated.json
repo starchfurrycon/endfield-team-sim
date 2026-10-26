@@ -1,0 +1,15 @@
+{
+  "_comment": "人工核对过的修正项。每条都必须写清楚『改什么 / 为什么 / 出处』，构建时会应用并在 check 报告里列出。优先级高于 wiki 与客户端表。",
+  "operators": {
+    "chr_0038_purrche": {
+      "skill_elements": {
+        "battle_skill": "自然"
+      },
+      "note": "属性仍是物理（客户端 charTypeId 与 Talos 一致）；但战技二段『LEAVE MY FRIENDS ALONE!』造成自然伤害并施加自然附着，原本因缺少 wiki 文本被当成物理。",
+      "sources": [
+        "https://endfield.wiki.gg/wiki/Purrchena",
+        "https://baike.baidu.com/item/噗切娜/68809715"
+      ]
+    }
+  }
+}

@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .. import config
+from .. import __version__
 from ..model import Dataset
 from ..engine.battle import Scenario
 from ..search.rotations import search_rotation
@@ -137,14 +138,29 @@ def start_build(verbose: bool = False) -> None:
 
 def meta() -> dict:
     ds = dataset()
-    ops = []
-    for op in sorted(ds.operators.values(), key=lambda o: (o.rarity or 0, o.char_id),
-                     reverse=True):
+    # 同一中文名可能有多份客户端数据（管理员 男/女/占位），UI 只该看到一个人，
+    # 取技能数据最全的那份当代表，其余列进 variants 供"知道有分版"。
+    groups: dict[str, list] = {}
+    for op in ds.operators.values():
+        if not op.name_zh:
+            continue
         if not any(s.slot == "battle_skill" for s in op.skills.values()):
             continue
+        groups.setdefault(op.name_zh, []).append(op)
+
+    def rank(o) -> tuple:
+        return (len(o.skills), o.rarity or 0, o.char_id)
+
+    picked = [(name, max(ops, key=rank)) for name, ops in groups.items()]
+    picked.sort(key=lambda x: (x[1].rarity or 0, x[0]), reverse=True)
+
+    ops = []
+    for name, op in picked:
+        variants = sorted(o.char_id for o in groups[name])
         ops.append({
             "id": op.char_id,
             "name": op.name_zh,
+            "eng_name": op.eng_name,
             "rarity": op.rarity,
             "profession": op.profession,
             "element": op.element,
@@ -153,8 +169,11 @@ def meta() -> dict:
             "main_attr": op.main_attr,
             "combo_trigger": (op.semantics or {}).get("combo_trigger"),
             "hit_dependent": (op.semantics or {}).get("has_hit_dependent_skill"),
+            "avatar": (config.AVATARS / f"{op.char_id}.png").is_file(),
+            "variants": variants,
         })
     return {"version": ds.version, "count": len(ops), "operators": ops,
+            "app_version": __version__,
             "constants": {k: v for k, v in config.GUESSED.items()},
             "enemies": {"slow": 12, "normal": 8, "fast": 5, "burst": 4},
             "equip_presets": [{"id": "none", "label": "不穿装备"},
@@ -345,6 +364,15 @@ class Handler(BaseHTTPRequestHandler):
             if not f.exists():
                 return self._json(404, {"error": "desktop/index.html 不存在"})
             return self._send(200, f.read_bytes(), "text/html; charset=utf-8")
+        if path.startswith("/avatars/"):
+            name = path[len("/avatars/"):]
+            if (not name.endswith(".png") or "/" in name or "\\" in name
+                    or ".." in name):
+                return self._json(404, {"error": "bad avatar name"})
+            f = config.AVATARS / name
+            if f.is_file():
+                return self._send(200, f.read_bytes(), "image/png")
+            return self._json(404, {"error": "no avatar"})
         if path == "/api/status":
             return self._json(200, status())
         if path == "/api/meta":

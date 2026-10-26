@@ -33,3 +33,6 @@ desktop/_*.log
 
 # 发行打包产物（只上传到 Release，不进仓库）
 release/
+
+# 干员头像（运行时从社区 wiki 抓取，不随仓库分发）
+data/avatars/

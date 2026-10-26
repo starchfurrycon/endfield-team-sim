@@ -14,7 +14,7 @@ from pathlib import Path
 
 from .. import config
 from ..model import Hit, Operator, Skill, SkillLevel, Timing
-from . import github, wiki
+from . import avatars, curated, github, wiki
 from .coverage import crosscheck_skilldata as cov_crosscheck
 
 CACHE = config.RAW / "github"
@@ -337,9 +337,12 @@ def build(force: bool = False, verbose: bool = True, progress=None) -> dict:
         wk = wiki_index.get(name)
 
         # 以 wiki 数据校正（wiki 更贴近中文口径）
+        elem_source = "client"
         if wk:
             profession = wk.get("profession") or profession
-            elem = wk.get("element") or elem
+            if wk.get("element"):
+                elem = wk["element"]
+                elem_source = "wiki"
             weapon_type = wk.get("weapon_type") or weapon_type
 
         # ---- 属性成长
@@ -480,6 +483,7 @@ def build(force: bool = False, verbose: bool = True, progress=None) -> dict:
             "skills": w.get("weaponSkillList") or [],
         }
         op.mods = _collect_mods(cid, teffects, t)
+        op.sources["element"] = elem_source
         operators[cid] = op
         report(0.55 + 0.22 * (len(operators) / max(1, len(chars) - 2)),
                f"解析干员（{len(operators)} / {len(chars) - 2}）")
@@ -518,6 +522,18 @@ def build(force: bool = False, verbose: bool = True, progress=None) -> dict:
             op.wiki = {"title": op.name_zh, "error": f"{type(e).__name__}: {e}"}
         report(0.77 + 0.13 * (wiki_ok / wiki_total), f"抓取 Wiki 文本（{wiki_ok} / {wiki_total}）")
 
+    # ---- 人工核对修正（curated）：优先级高于表与 wiki
+    curated_applied: dict[str, list[str]] = {}
+    for cid, op in operators.items():
+        try:
+            notes = curated.apply_to_operator(op)
+        except Exception:  # noqa: BLE001
+            notes = []
+        if notes:
+            curated_applied[cid] = notes
+    if curated_applied and verbose:
+        print(f"[build] 人工修正生效：{', '.join(sorted(curated_applied))}")
+
     report(0.91, "写归一化数据")
     # ---- 落盘
     for cid, op in operators.items():
@@ -526,6 +542,18 @@ def build(force: bool = False, verbose: bool = True, progress=None) -> dict:
 
     version = _dataset_version(head, operators, wiki_meta)
     coverage = compute_coverage(operators, wiki_index)
+
+    # ---- 属性元数据（引擎据此归类属性，新版本加属性也不会静默算错）
+    attr_meta: dict[str, dict] = {}
+    try:
+        am = src.table("AttributeMetaTable.json") or {}
+        for k, row in am.items():
+            attr_meta[str(k)] = {"icon": str(row.get("iconName") or ""),
+                                 "name": t(row.get("name")) or ""}
+    except Exception as e:  # noqa: BLE001
+        if verbose:
+            print(f"[build] 属性元数据不可用：{type(e).__name__}")
+
     cross: dict = {}
     try:
         if wsd:
@@ -542,10 +570,14 @@ def build(force: bool = False, verbose: bool = True, progress=None) -> dict:
             "wiki": wiki_meta,
             "tables": ["CharacterTable", "SkillPatchTable", "BattleConst",
                        "AttributeMetaTable", "CharTypeTable", "CharProfessionTable",
-                       "CharBattleTagTable", "I18nTextTable_CN"],
+                       "CharBattleTagTable", "I18nTextTable_CN", "ItemTable"],
         },
         "constants": {"battle_const": battle_const,
-                      "attr_names": {str(k): v for k, v in config.ATTR_NAMES.items()}},
+                      "attr_names": {str(k): v for k, v in config.ATTR_NAMES.items()},
+                      # 属性 id -> {icon, name}：引擎据此把**新属性**归到正确乘区，
+                      # 而不是写死一堆 id（新版本加属性时不会静默算错）
+                      "attr_meta": attr_meta},
+        "curated": curated_applied,
         "coverage": coverage,
         "crosscheck": {k: v for k, v in cross.items() if k != "details"} if cross else {},
     }
@@ -626,6 +658,15 @@ def build(force: bool = False, verbose: bool = True, progress=None) -> dict:
         if verbose:
             print(f"[build] 武器索引跳过：{type(e).__name__}")
 
+    # ---- 干员头像（可选增强；失败不影响构建，UI 用占位图）
+    report(0.95, "下载干员头像…")
+    avatar_stats: dict = {}
+    try:
+        avatar_stats = avatars.fetch_many(operators, verbose=verbose)
+    except Exception as e:  # noqa: BLE001
+        if verbose:
+            print(f"[build] 头像跳过：{type(e).__name__}")
+
     manifest = {
         "version": version,
         "built_at": dataset["created_at"],
@@ -633,6 +674,8 @@ def build(force: bool = False, verbose: bool = True, progress=None) -> dict:
         "wiki": wiki_meta,
         "operators": len(operators),
         "operators_with_wiki": wiki_ok,
+        "curated": curated_applied,
+        "avatars": avatar_stats,
         "coverage": coverage,
         "crosscheck": {k: v for k, v in cross.items() if k != "details"} if cross else {},
     }
@@ -642,6 +685,15 @@ def build(force: bool = False, verbose: bool = True, progress=None) -> dict:
     if cross and cross.get("matched"):
         from .coverage import write_crosscheck
         write_crosscheck(cross)
+
+    # ---- 数据自检报告（数据更新后"还知道自己在算什么吗"）
+    try:
+        from ..model import Dataset as _Dataset
+        from . import quality
+        quality.write_report(_Dataset.load(config.NORM), manifest)
+    except Exception as e:  # noqa: BLE001
+        if verbose:
+            print(f"[build] 数据自检报告跳过：{type(e).__name__}")
 
     report(1.0, f"完成：{len(operators)} 名干员，version={version}")
     if verbose:
@@ -809,6 +861,11 @@ def compute_coverage(operators: dict[str, Operator], wiki_index: dict) -> dict:
     missing_chain: list[str] = []
     missing_power: list[str] = []
     missing_battle: list[str] = []
+    element_from_client: list[str] = []
+    element_from_curated: list[str] = []
+    skills_total = 0
+    skills_explicit_element = 0
+    skills_no_element: list[str] = []
     for cid, op in operators.items():
         if all(sk.timing.duration_frames is not None for sk in op.skills.values()):
             with_timing += 1
@@ -816,12 +873,24 @@ def compute_coverage(operators: dict[str, Operator], wiki_index: dict) -> dict:
             with_mults += 1
         if op.wiki.get("fields"):
             with_wiki += 1
+        src = (op.sources or {}).get("element", "client")
+        if src == "client":
+            element_from_client.append(cid)
+        elif src == "curated":
+            element_from_curated.append(cid)
         if len(op.normal_chain) < 3:
             missing_chain.append(cid)
         if not any(s.slot == "power_attack" for s in op.skills.values()):
             missing_power.append(cid)
         if not any(s.slot == "battle_skill" for s in op.skills.values()):
             missing_battle.append(cid)
+        for sk in op.skills.values():
+            skills_total += 1
+            if sk.element:
+                skills_explicit_element += 1
+            elif sk.slot in ("battle_skill", "combo_skill", "ultimate"):
+                # 技能自身没有元素 → 引擎会退回干员元素；这类是最容易"算错"的地方
+                skills_no_element.append(sk.skill_id)
     return {
         "operators": total,
         "with_full_timing": with_timing,
@@ -831,4 +900,10 @@ def compute_coverage(operators: dict[str, Operator], wiki_index: dict) -> dict:
         "missing_power_attack": missing_power,
         "missing_battle_skill": missing_battle,
         "wiki_only": sorted(set(wiki_index) - {o.name_zh for o in operators.values()}),
+        # 数据"可信度"维度：元素从哪来、哪些技能没写元素
+        "element_from_client": sorted(element_from_client),
+        "element_from_curated": sorted(element_from_curated),
+        "skills_total": skills_total,
+        "skills_with_explicit_element": skills_explicit_element,
+        "skills_element_fallback": sorted(skills_no_element),
     }

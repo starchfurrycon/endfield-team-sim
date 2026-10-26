@@ -275,6 +275,7 @@ class Dataset:
     sources: dict[str, Any] = field(default_factory=dict)
     operators: dict[str, Operator] = field(default_factory=dict)
     coverage: dict[str, Any] = field(default_factory=dict)
+    constants: dict[str, Any] = field(default_factory=dict)
 
     @property
     def by_name(self) -> dict[str, Operator]:
@@ -330,4 +331,5 @@ class Dataset:
             sources=idx.get("sources", {}),
             operators=ops,
             coverage=idx.get("coverage", {}),
+            constants=idx.get("constants", {}),
         )
