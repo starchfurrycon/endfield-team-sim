@@ -432,14 +432,52 @@ class Battle:
                 v = float(vals[min(lv, len(vals) - 1)] or 0.0)
                 if v:
                     acc[attr] = acc.get(attr, 0.0) + v
+        # 套装：同套 >= need 件时施加被动黑板
+        suits = (self._equip_table().get("suits") or {})
+        counts: dict[str, int] = {}
+        for iid in ids:
+            for sid, srow in suits.items():
+                if iid in (srow.get("pieces") or []):
+                    counts[sid] = counts.get(sid, 0) + 1
+        for sid, n in counts.items():
+            srow = suits.get(sid) or {}
+            if n < int(srow.get("need", 3)):
+                continue
+            for k, v in (srow.get("passive_bb") or {}).items():
+                if k in ("str", "agi", "wisd", "will"):
+                    acc["__attr_" + k] = acc.get("__attr_" + k, 0.0) + float(v)
+                elif k in ("atk",):
+                    acc["__atk_pct__"] = acc.get("__atk_pct__", 0.0) + float(v)
+                elif k in ("atk_up", "dmg_up", "dmg"):
+                    acc["__dmg__"] = acc.get("__dmg__", 0.0) + float(v)
+                elif k.endswith("_dmg_up"):
+                    acc["__dmg__"] = acc.get("__dmg__", 0.0) + float(v)
+                elif k in ("agi_up", "str_up", "wisd_up", "will_up"):
+                    acc["__attr_" + k[:-3]] = acc.get("__attr_" + k[:-3], 0.0) + float(v)
+
         if not acc:
             return
         for cid in self.ids:
             m = self.mod[cid]
             for attr, v in acc.items():
+                if attr == "__atk_pct__":
+                    m["atk_pct"] = m.get("atk_pct", 0.0) + v
+                    m["applied"].append(f"SET:atk+{v:.1%}")
+                    continue
+                if attr == "__dmg__":
+                    m["dmg_bonus"] += v
+                    m["applied"].append(f"SET:dmg+{v:.1%}")
+                    continue
+                if attr.startswith("__attr_"):
+                    k2 = attr[7:]
+                    m["attrs"][k2] = m["attrs"].get(k2, 0.0) + v
+                    m["applied"].append(f"SET:{k2}+{v:g}")
+                    continue
                 try:
                     a = int(attr)
                 except ValueError:
+                    continue
+                if attr.startswith("__"):
                     continue
                 if a in self._ATTR_MAIN:
                     k = self._ATTR_MAIN[a]

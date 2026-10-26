@@ -509,8 +509,21 @@ def build(force: bool = False, verbose: bool = True) -> dict:
                 key = str(m.get("attrType"))
                 attrs[key] = [float(v or 0.0) for v in vals[:4]]
             equip_index[iid] = {"attrs": attrs}
-        suit_index = {sid: {"pieces": (v.get("equipList") or [])[:12]}
-                      for sid, v in suits.items()}
+        suit_index = {}
+        for sid, v in suits.items():
+            bbs = {}
+            for entry in v.get("list") or []:
+                skid = entry.get("skillID") or ""
+                rows = (patches.get(skid) or {}).get("SkillPatchDataBundle") or []
+                if not rows:
+                    continue
+                for x in rows[0].get("blackboard") or []:
+                    val = float(x.get("value") or 0.0)
+                    if val:
+                        bbs[x["key"]] = bbs.get(x["key"], 0.0) + val
+            suit_index[sid] = {"pieces": (v.get("equipList") or [])[:12],
+                               "need": (v.get("list") or [{}])[0].get("equipCnt", 3),
+                               "passive_bb": bbs}
         (config.NORM / "equip.json").write_text(
             json.dumps({"items": equip_index, "suits": suit_index},
                        ensure_ascii=False), encoding="utf-8")

@@ -181,6 +181,11 @@ function renderTeams(data){
       tabs.appendChild(b);
     });
     c.appendChild(tabs);
+    const loBtn = el('button', 'off', '装备/武器推荐');
+    loBtn.style.marginLeft = '6px';
+    loBtn.onclick = () => loadLoadout(t, card);
+    tabs.appendChild(loBtn);
+
     const holder = el('div'); holder.id = 'axis-'+i; c.appendChild(holder);
     box.appendChild(c);
     if(i===0) loadAxis(t, MODE, c);
@@ -303,6 +308,35 @@ function renderAxis(res, t){
     wrap.appendChild(w);
   }
   return wrap;
+}
+
+async function loadLoadout(t, card){
+  const box = card.querySelector('[id^=loadout-]') || el('div');
+  box.id = box.id || ('loadout-' + Math.random().toString(36).slice(2,7));
+  if(!box.parentNode) card.appendChild(box);
+  box.innerHTML = '<div class="muted">计算中…</div>';
+  const r = await fetch('/api/loadout', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({team: t.team})});
+  const data = await r.json();
+  if(data.error){ box.innerHTML = '<div class="warn">'+data.error+'</div>'; return; }
+  box.innerHTML = '';
+  for(const [cid, row] of Object.entries(data.recommendations || {})){
+    const blk = el('div'); blk.style.margin = '8px 0';
+    blk.appendChild(el('div', null, row.name));
+    const tb = el('table');
+    tb.innerHTML = '<tr><th>武器</th><th>稀有</th><th>ATK</th><th>ATK%</th><th>主属性</th><th>等效</th></tr>';
+    (row.weapons||[]).forEach(w => {
+      const tr = el('tr');
+      tr.innerHTML = `<td>${w.weapon_id}</td><td>${w.rarity}★</td><td>${w.atk}</td>`+
+        `<td>${(w.atk_pct*100).toFixed(0)}%</td><td>+${w.mainattr}</td><td>${Math.round(w.score)}</td>`;
+      tb.appendChild(tr);
+    });
+    blk.appendChild(tb);
+    (row.equipment||[]).forEach(s => {
+      blk.appendChild(el('div','muted', `${s.label}（精锻 ${s.enhance_level}）：` + s.pieces.join('、')));
+    });
+    box.appendChild(blk);
+  }
 }
 
 $('#go').onclick = runTeam;

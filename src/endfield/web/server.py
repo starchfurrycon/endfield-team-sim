@@ -90,6 +90,19 @@ def team(payload: dict) -> dict:
     return res
 
 
+def loadout(payload: dict) -> dict:
+    from ..search import loadout as lo
+    ds = dataset()
+    ids = [x for x in (payload.get("team") or []) if x]
+    if not ids:
+        raise ValueError("team 为空")
+    return {"team": ids,
+            "recommendations": lo.recommend_for_team(
+                ds, ids[:4],
+                int(payload.get("weapons", 3)),
+                int(payload.get("sets", 2)))}
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "EndfieldSim/0.1"
 
@@ -153,6 +166,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if u.path == "/api/team":
                 return self._json(200, team(payload))
+            if u.path == "/api/loadout":
+                return self._json(200, loadout(payload))
             if u.path == "/api/axis":
                 return self._json(200, axis(payload))
         except Exception as e:  # noqa: BLE001
