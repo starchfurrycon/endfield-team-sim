@@ -264,6 +264,30 @@ class TestEquipment(unittest.TestCase):
         self.assertEqual(eq, [])
 
 
+class TestLoadout(unittest.TestCase):
+    def test_weapon_recommendations(self):
+        from endfield.search import loadout
+        ds = _ds()
+        cid = ds.resolve("陈千语").char_id
+        recs = loadout.recommend_weapons(ds, cid, top=3)
+        self.assertEqual(len(recs), 3)
+        scores = [r["score"] for r in recs]
+        self.assertEqual(scores, sorted(scores, reverse=True))
+
+    def test_equipment_two_sets_with_slots(self):
+        from endfield.search import loadout
+        ds = _ds()
+        cid = ds.resolve("陈千语").char_id
+        sets = loadout.recommend_equipment(ds, cid, top=2)
+        self.assertEqual(len(sets), 2)
+        for s in sets:
+            self.assertEqual(len(s["pieces"]), 4)
+            body = sum(1 for x in s["pieces"] if "_body_" in x)
+            hand = sum(1 for x in s["pieces"] if "_hand_" in x)
+            edc = sum(1 for x in s["pieces"] if "_edc_" in x)
+            self.assertEqual((body, hand, edc), (1, 1, 2))
+
+
 if __name__ == "__main__":
     unittest.main()
 
