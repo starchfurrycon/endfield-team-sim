@@ -67,8 +67,7 @@ button:disabled{opacity:.4;cursor:default}
 .row{display:flex;gap:6px;align-items:center;margin-bottom:8px}
 .row .muted{white-space:nowrap;flex:0 0 auto;color:var(--muted2)}
 /* 左栏控件 */
-#side .sec{display:none}
-#side .row{margin:0 0 8px}
+#side #side .row{margin:0 0 8px}
 #side .row .muted{color:#8b8f8a;font-size:10px;font-family:var(--mono);letter-spacing:.08em}
 #side button{background:#232623;color:#e9e9e4;border:1px solid #343633}
 #side button:hover{background:#2c302c}
@@ -107,7 +106,6 @@ button:disabled{opacity:.4;cursor:default}
 .card{position:relative;background:var(--card);border:1px solid var(--line);
   border-radius:7px;padding:14px 16px 15px;margin-bottom:14px}
 .card-h{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.card-h .lat{display:none}
 .card-h .team{display:flex;gap:6px;align-items:center}
 .tabs{display:flex;gap:6px;margin-left:8px}
 .tabs button{padding:3px 10px;font-size:11px;background:transparent;color:var(--muted);
@@ -154,7 +152,6 @@ button:disabled{opacity:.4;cursor:default}
 .wl-row .track{height:16px;background:transparent;border-bottom:1px solid var(--line)}
 .wl-row .track::after{display:none}
 .wl-row .cap{font-family:var(--mono);font-size:9px;color:var(--muted2);text-align:right}
-.wl-name{display:none}
 .wl svg{position:absolute;inset:0;width:100%;height:100%}
 .wl-cursor{position:absolute;top:0;bottom:0;width:1px;background:var(--ink);opacity:.4;
   display:none;pointer-events:none}
@@ -239,7 +236,6 @@ td{font-family:var(--mono);font-size:10.5px}
 .llm-table{width:100%;font-size:10.5px;font-family:var(--mono)}
 .llm-table td{padding:2px 5px;border-bottom:1px solid var(--line);color:var(--muted)}
 /* 桌面标题栏（不再使用，保留兼容） */
-.tb{display:none}
 
 
 /* ---------- v3.3：学官网的卡片 / 药丸 / 黄块 / 彩虹线 ---------- */
@@ -281,7 +277,6 @@ td{font-family:var(--mono);font-size:10.5px}
 .op::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;opacity:0;
   background:linear-gradient(90deg,#ff5a5a,#ffb020,#ffe500,#4ade80,#38bdf8,#a78bfa)}
 .op:hover::after,.op.must::after{opacity:1}
-.op .st{display:none}
 
 /* 详情：文字详情页的处理 */
 details{background:var(--card);border:1px solid var(--line);border-radius:3px;
@@ -295,6 +290,28 @@ details th{background:var(--ink);color:#fff;border-color:var(--ink)}
 details td{border-color:var(--line)}
 details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em;
   color:var(--muted);margin:10px 0 2px;text-transform:uppercase}
+
+/* 怎么打 */
+.guide{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.guide-h{display:flex;gap:10px;align-items:baseline;margin-bottom:8px}
+.guide-h .lat{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--muted)}
+.guide-h .hint{font-size:10px;color:var(--muted2);margin-left:auto}
+.gsteps{display:flex;gap:6px;flex-wrap:wrap}
+.gstep{display:flex;gap:6px;align-items:center;background:var(--paper);
+  border:1px solid var(--line);border-radius:4px;padding:4px 9px;font-size:11px;
+  color:var(--ink);font-weight:400}
+.gstep:hover{border-color:var(--ink);background:#fff}
+.gt{font-family:var(--mono);font-size:9px;color:var(--muted)}
+.gl{font-weight:600}
+.gn{font-size:9px;color:var(--muted);border-left:1px solid var(--line);padding-left:7px}
+.gtips{margin-top:9px;display:grid;gap:3px}
+.gtip{font-size:11px;color:var(--ink2)}
+.gnote{font-size:10px;color:var(--muted2);margin-top:7px}
+.empty{background:var(--card);border:1px dashed var(--line2);border-radius:4px;
+  padding:28px;text-align:center}
+.empty-t{font-size:16px;font-weight:600;margin-bottom:4px}
+.empty-s{font-size:11px;color:var(--muted);margin-bottom:12px}
+#result.busy{opacity:.45;transition:opacity .15s}
 </style>
 </head>
 <body>
@@ -522,8 +539,6 @@ function renderElems(){
 
 function renderOps(){
   if(!META) return;
-  const cnt = $('#op-count');
-  if(cnt) cnt.textContent = META.count + ' / ' + META.operators.length;
   const q = ($('#q').value||'').trim().toLowerCase();
   const box = $('#ops'); box.innerHTML = '';
   META.operators
@@ -538,7 +553,8 @@ function renderOps(){
       dot.style.setProperty('--el', ELEM_COLOR[o.element] || '#888');
       row.appendChild(dot);
       row.appendChild(el('span','idx', String(box.children.length + 1).padStart(2,'0')));
-      row.onclick = () => { STATE[o.id] = (STATE[o.id]+1)%3; renderOps(); };
+      row.onclick = () => { STATE[o.id] = (STATE[o.id]+1)%3; renderOps();
+        savePrefs(); scheduleRun(); };
       row.title = `${o.name} · ${o.profession || ''} · ${o.element || ''}`
         + (o.note ? '\n' + o.note : '');
       box.appendChild(row);
@@ -547,15 +563,64 @@ function renderOps(){
 
 function picked(kind){ return Object.keys(STATE).filter(k => STATE[k]===kind); }
 
-async function runTeam(){
-  const btn = $('#go'); btn.disabled = true; btn.textContent = '…';
+let RUN_TOKEN = 0, RUN_TIMER = null;
+
+function scheduleRun(delay){
+  clearTimeout(RUN_TIMER);
+  RUN_TIMER = setTimeout(runTeam, delay == null ? 260 : delay);
+}
+
+function savePrefs(){
   try{
-    const data = await jpost('/api/team', {must: picked(1), ban: picked(2),
+    localStorage.setItem('sx.state', JSON.stringify(STATE));
+    localStorage.setItem('sx.params', JSON.stringify({
+      dur: $('#dur').value, top: $('#top').value, enemy: $('#eprofile').value}));
+  }catch(e){}
+}
+
+function renderEmpty(){
+  const box = $('#result'); box.className = 'cards'; box.innerHTML = '';
+  const empty = el('div','empty');
+  empty.appendChild(el('div','empty-t','选 4 名干员'));
+  empty.appendChild(el('div','empty-s','点左侧头像：一次必须 · 两次禁止 · 三次清除'));
+  const b = el('button', null, '示例队伍');
+  b.onclick = () => {
+    ['陈千语','大潘','萤石','埃特拉'].forEach(n => {
+      const o = META.operators.find(x => x.name === n);
+      if(o) STATE[o.id] = 1;
+    });
+    renderOps(); savePrefs(); runTeam();
+  };
+  empty.appendChild(b); box.appendChild(empty);
+  const hm = $('#hero-meta');
+  if(hm && META) hm.textContent = '0 / ' + META.count;
+}
+
+async function runTeam(){
+  if(!META) return;
+  const must = picked(1);
+  if(!must.length){ renderEmpty(); return; }
+  const token = ++RUN_TOKEN;
+  const btn = $('#go'); btn.disabled = true;
+  const hm = $('#hero-meta'); const prevMeta = hm ? hm.textContent : '';
+  if(hm) hm.textContent = '计算中…';
+  $('#result').classList.add('busy');
+  try{
+    const data = await jpost('/api/team', {must, ban: picked(2),
       duration: +$('#dur').value, top: +$('#top').value, evaluate: 8});
+    if(token !== RUN_TOKEN) return;
     renderTeams(data);
   }catch(e){
-    $('#result').innerHTML = ''; $('#result').appendChild(el('div','warn', e.message));
-  }finally{ btn.disabled = false; btn.textContent = '推荐'; }
+    if(token !== RUN_TOKEN) return;
+    const box = $('#result'); box.innerHTML = '';
+    box.appendChild(el('div','warn', e.message));
+  }finally{
+    if(token === RUN_TOKEN){
+      btn.disabled = false;
+      $('#result').classList.remove('busy');
+      if(hm && !$('#result').querySelector('.card')) hm.textContent = prevMeta;
+    }
+  }
 }
 
 function renderTeams(data){
@@ -619,7 +684,7 @@ async function loadAxis(t, mode, card){
   try{
     const data = await jget('/api/axis?' + q.toString());
     holder.innerHTML = '';
-    holder.appendChild(renderAxis(data.rotation.result, t, data.config));
+    holder.appendChild(renderAxis(data.rotation.result, t, data.config, data.guide));
   }catch(e){
     holder.innerHTML = '';
     holder.appendChild(el('div','warn', e.message));
@@ -678,6 +743,34 @@ function gantt(res, order, nameMap){
   return {box, ticks};
 }
 
+function guideBlock(g){
+  const wrap = el('div','guide');
+  const head = el('div','guide-h');
+  head.appendChild(el('span','lat','怎么打'));
+  head.appendChild(el('span','hint','按时间从上到下'));
+  wrap.appendChild(head);
+  const row = el('div','gsteps');
+  (g.steps||[]).forEach(s => {
+    const op = META.operators.find(o => o.id === s.cid);
+    const b = el('button','gstep');
+    b.appendChild(el('span','gt', s.t.toFixed(1)+'s'));
+    b.appendChild(avatar(op || s.cid, 18, s.name));
+    b.appendChild(el('span','gl', s.label + (s.count>1 ? '×'+s.count : '')));
+    if(s.note) b.appendChild(el('span','gn', s.note));
+    b.title = `${s.name} · ${s.skill || s.label} @ ${s.t.toFixed(2)}s`
+      + (s.note ? `（${s.note}）` : '');
+    row.appendChild(b);
+  });
+  wrap.appendChild(row);
+  if(g.tips && g.tips.length){
+    const tips = el('div','gtips');
+    g.tips.forEach(tx => tips.appendChild(el('div','gtip', '· ' + tx)));
+    wrap.appendChild(tips);
+  }
+  if(g.note) wrap.appendChild(el('div','gnote', g.note));
+  return wrap;
+}
+
 function waterlines(res, order, nameMap){
   const st = res.stats || {};
   const samples = (st.samples || []).slice().sort((a,b)=>a.f-b.f);
@@ -733,11 +826,6 @@ function waterlines(res, order, nameMap){
     wrap.appendChild(row(avatar(op || cid, 16, nameMap[cid]),
       OP_COLORS[i % OP_COLORS.length], caps[cid] || 100,
       s=>((s.e||{})[cid]||0), cid));
-    const lastRow = wrap.lastElementChild;
-    if(lastRow){
-      const nm = el('span','wl-name', nameMap[cid] || '');
-      lastRow.querySelector('.lb').appendChild(nm);
-    }
   });
 
   if(samples.length){
@@ -768,7 +856,7 @@ function waterlines(res, order, nameMap){
   return wrap;
 }
 
-function renderAxis(res, t, cfg){
+function renderAxis(res, t, cfg, guide){
   const wrap = el('div');
   const order = t.team, nameMap = t.name_map || {};
   const g = gantt(res, order, nameMap);
@@ -788,6 +876,7 @@ function renderAxis(res, t, cfg){
     bar.appendChild(seg);
   });
   wrap.appendChild(bar);
+  if(guide) wrap.appendChild(guideBlock(guide));
 
   const meta = el('div','meta-line');
   const det = el('details');
@@ -1076,7 +1165,11 @@ function startLLMPoll(){
       renderLLMRun(LLM.run || {});
       if(LLM.run && LLM.run.state !== 'running'){
         clearInterval(LLM_POLL); LLM_POLL = null;
-        if(LLM.run.state === 'done') await loadMeta();
+        if(LLM.run.state === 'done'){
+          await loadMeta();
+          renderOps();
+          if(picked(1).length) runTeam();
+        }
       }
     }catch(e){}
   }, 900);
@@ -1123,8 +1216,18 @@ function renderLLMRun(run){
 /* ------------------------------------------------------------ 绑定 */
 
 $('#go').onclick = runTeam;
-$('#clr').onclick = () => { Object.keys(STATE).forEach(k => STATE[k] = 0); renderOps(); };
+$('#clr').onclick = () => {
+  Object.keys(STATE).forEach(k => STATE[k] = 0);
+  renderOps(); savePrefs(); renderEmpty();
+};
 $('#q').oninput = renderOps;
+['dur','top','eprofile'].forEach(id => {
+  const node = $('#'+id);
+  if(node) node.addEventListener('change', () => {
+    savePrefs();
+    if(picked(1).length) scheduleRun();
+  });
+});
 
 function initShell(){
   const shell = location.search.includes('shell=1');
@@ -1133,12 +1236,26 @@ function initShell(){
 
 }
 
+function restorePrefs(){
+  try{
+    const st = JSON.parse(localStorage.getItem('sx.state') || '{}');
+    Object.keys(st).forEach(k => { if(META.operators.some(o => o.id === k)) STATE[k] = st[k]; });
+    const pr = JSON.parse(localStorage.getItem('sx.params') || '{}');
+    if(pr.dur) $('#dur').value = pr.dur;
+    if(pr.top) $('#top').value = pr.top;
+    if(pr.enemy) $('#eprofile').value = pr.enemy;
+  }catch(e){}
+}
+
 (async function boot(){
   initShell();
   try{
     await waitForData();
     await loadMeta();
     await loadLLM();
+    restorePrefs();
+    renderOps();
+    if(picked(1).length) runTeam(); else renderEmpty();
   }catch(e){
     $('#result').textContent = e.message;
   }

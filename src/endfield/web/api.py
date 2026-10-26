@@ -8,6 +8,7 @@ from __future__ import annotations
 from .. import __version__, config
 from ..engine.battle import Scenario
 from ..model import Dataset
+from ..report import guide as guide_mod
 from ..search.rotations import search_rotation
 from ..search.teams import TeamQuery, recommend
 from . import jobs
@@ -119,7 +120,8 @@ def axis(payload: dict) -> dict:
                          steps=int(payload.get("steps", 26)),
                          opening_ults=(sc.start_energy == "hot"))
     return {"mode": sc.start_energy, "rotation": rr.to_dict(),
-            "config": _config_summary(ds, sc)}
+            "config": _config_summary(ds, sc),
+            "guide": guide_mod.build(ds, sc, rr.result)}
 
 
 def _config_summary(ds: Dataset, sc: Scenario) -> dict:
