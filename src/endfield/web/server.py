@@ -64,7 +64,8 @@ def axis(payload: dict) -> dict:
     sc = Scenario(team=ids[:4], start_energy=mode,
                   duration_s=float(payload.get("duration", 40)),
                   level=int(payload.get("level", 80)),
-                  skill_level=int(payload.get("skill_level", 7)))
+                  skill_level=int(payload.get("skill_level", 12)),
+                  enemy_profile=str(payload.get("enemy_profile") or "normal"))
     rr = search_rotation(ds, sc, beam=int(payload.get("beam", 3)),
                          steps=int(payload.get("steps", 26)),
                          opening_ults=(mode == "hot"))
@@ -153,6 +154,7 @@ class Handler(BaseHTTPRequestHandler):
                 "team": [x for x in (q.get("team", [""])[0]).split(",") if x],
                 "mode": q.get("mode", ["cold"])[0],
                 "duration": q.get("duration", ["40"])[0],
+                "enemy_profile": q.get("enemy", ["normal"])[0],
             }
             try:
                 return self._json(200, axis(payload))

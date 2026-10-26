@@ -93,6 +93,12 @@
       <label>窗口(s)</label><input id="dur" type="number" value="40" style="width:64px"/>
       <label>Top</label><input id="top" type="number" value="3" style="width:52px"/>
       <label>评估</label><input id="eval" type="number" value="8" style="width:52px"/>
+      <label>敌人</label><select id="eprofile">
+        <option value="normal">普通 8s</option>
+        <option value="slow">缓慢 12s</option>
+        <option value="fast">快速 5s</option>
+        <option value="burst">爆发 4s</option>
+      </select>
     </div>
     <div class="row">
       <button id="go">推荐配队</button>
@@ -204,7 +210,8 @@ function kpiBox(cls,label,dps,dmg){
 async function loadAxis(t, mode, card){
   const holder = card.querySelector('[id^=axis-]') || el('div');
   holder.innerHTML = '<div class="muted">计算中…</div>';
-  const q = new URLSearchParams({team:t.team.join(','), mode, duration:$('#dur').value});
+  const q = new URLSearchParams({team:t.team.join(','), mode,
+    duration:$('#dur').value, enemy: ($('#eprofile')||{}).value || 'normal'});
   const r = await fetch('/api/axis?'+q.toString());
   const data = await r.json();
   if(data.error){ holder.innerHTML = '<div class="warn">'+data.error+'</div>'; return; }
