@@ -62,10 +62,11 @@ TABLES = [
     "I18nTextTable_CN.json",
     "WeaponBasicTable.json",
     "WeaponUpgradeTemplateTable.json",
+    "PotentialTalentEffectTable.json",
 ]
 
 # 数据 schema 版本：字段结构变化时 +1，强制重建缓存
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # ---------------------------------------------------------------- 时间
 

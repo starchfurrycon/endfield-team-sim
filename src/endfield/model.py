@@ -164,6 +164,7 @@ class Operator:
     sub_attr: str | None = None
     default_weapon_id: str | None = None
     weapon: dict = field(default_factory=dict)
+    mods: dict = field(default_factory=dict)   # 天赋/潜能修正器
     battle_tags: list[str] = field(default_factory=list)
     stats: list[dict] = field(default_factory=list)   # [{level, str, agi, wisd, will, max_hp, atk, def}]
     skills: dict[str, Skill] = field(default_factory=dict)
@@ -196,6 +197,7 @@ class Operator:
             "sub_attr": self.sub_attr,
             "default_weapon_id": self.default_weapon_id,
             "weapon": self.weapon,
+            "mods": self.mods,
             "battle_tags": self.battle_tags,
             "stats": self.stats,
             "normal_chain": self.normal_chain,
@@ -247,6 +249,7 @@ class Operator:
             sub_attr=d.get("sub_attr"),
             default_weapon_id=d.get("default_weapon_id"),
             weapon=d.get("weapon") or {},
+            mods=d.get("mods") or {},
             battle_tags=d.get("battle_tags") or [],
             stats=d.get("stats") or [],
             skills=skills,

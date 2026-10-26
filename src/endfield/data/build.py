@@ -217,6 +217,17 @@ def build(force: bool = False, verbose: bool = True) -> dict:
         if verbose:
             print(f"[build] 武器表不可用：{type(e).__name__}")
 
+    # 天赋 / 潜能 数值表
+    teffects: dict = {}
+    try:
+        teffects = src.table("PotentialTalentEffectTable.json") or {}
+        if verbose:
+            print(f"[build] 天赋/潜能效果条目 {len(teffects)}")
+    except Exception as e:  # noqa: BLE001
+        if verbose:
+            print(f"[build] 天赋表不可用：{type(e).__name__}")
+    _DTYPE_ATTRS = {17, 28, 29, 32, 33, 50, 51, 52, 53, 54, 55, 61, 64, 65, 66, 67, 68, 69}
+
     def t(node) -> str | None:
         direct = _text(node)
         if direct:
@@ -396,6 +407,7 @@ def build(force: bool = False, verbose: bool = True) -> dict:
             "atk_by_level": [int(x.get("baseAtk") or 0) for x in curve],
             "skills": w.get("weaponSkillList") or [],
         }
+        op.mods = _collect_mods(cid, teffects, t)
         operators[cid] = op
 
     # ---- wiki 文本（逐干员，限速）
@@ -483,6 +495,39 @@ def build(force: bool = False, verbose: bool = True) -> dict:
     if verbose:
         print(f"[build] {len(operators)} 干员，{wiki_ok} 有 wiki 文本，version={version}")
     return manifest
+
+
+def _collect_mods(cid: str, teffects: dict, tr) -> dict:
+    """把天赋/潜能效果整理成 {talents: {level: [entry]}, potentials: {n: [entry]}}。"""
+    import re as _re
+    talents: dict[int, dict[int, list]] = {}
+    potentials: dict[int, list] = {}
+    for key, row in (teffects or {}).items():
+        m = _re.match(rf"{_re.escape(cid)}_talent_(\d+)_(\d+)$", key)
+        mp = _re.match(rf"{_re.escape(cid)}_potential_(\d+)$", key)
+        if not m and not mp:
+            continue
+        entries = []
+        for d in row.get("dataList") or []:
+            am = d.get("attrModifier") or {}
+            sb = d.get("skillBbModifier") or {}
+            cond = bool(d.get("activeCondition"))
+            if am.get("attrValue"):
+                entries.append({"kind": "attr", "attr": am.get("attrType"),
+                                "value": am.get("attrValue"), "conditional": cond})
+            if sb.get("bbKey") and sb.get("floatValue") not in (None, 0.0, 1.0):
+                entries.append({"kind": "bb", "key": sb.get("bbKey"),
+                                "value": sb.get("floatValue"), "conditional": cond})
+        if not entries:
+            continue
+        if m:
+            tal = int(m.group(1)); lv = int(m.group(2))
+            talents.setdefault(tal, {})[lv] = entries
+        else:
+            potentials[int(mp.group(1))] = entries
+    return {"talents": {str(k): {str(l): v for l, v in d.items()}
+                        for k, d in talents.items()},
+            "potentials": {str(k): v for k, v in potentials.items()}}
 
 
 # ---------------------------------------------------------------- wiki 文本

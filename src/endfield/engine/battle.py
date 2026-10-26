@@ -47,6 +47,8 @@ class Scenario:
     seed: int = 0
     # 主控以外的干员会自动普攻（游戏内教学页 wiki_tut_bat_team_1）
     offfield_auto_attack: bool = True
+    potential_level: int = 0      # 潜能等级 0~5（默认不点）
+    talent_level: int = 3         # 天赋阶段（取数据里可用的最高阶）
 
     def to_dict(self) -> dict:
         return copy.deepcopy(self.__dict__)
@@ -131,6 +133,7 @@ class Battle:
         self.per_op: dict[str, float] = {c: 0.0 for c in self.ids}
         self.pending: list[dict] = []
         self.rx = rxmod.ReactionState()
+        self.mod = self._build_mods()
         self.log: list[dict] = []
         self.issues: list[str] = []
         self.counters: dict[str, int] = {}
@@ -174,6 +177,21 @@ class Battle:
             if curve:
                 idx = max(0, min(int(self.sc.weapon_level), len(curve)) - 1)
                 w_atk = float(curve[idx])
+        extra = (self.mod.get(cid) or {}).get("attrs") or {}
+        for k in ("str", "agi", "wisd", "will"):
+            if k in extra:
+                if k == "str":
+                    main_v = (main_v or 0) + extra[k] if op.main_attr == "力量" else main_v
+                    sub_v = (sub_v or 0) + extra[k] if op.sub_attr == "力量" else sub_v
+                elif k == "agi":
+                    main_v = (main_v or 0) + extra[k] if op.main_attr == "敏捷" else main_v
+                    sub_v = (sub_v or 0) + extra[k] if op.sub_attr == "敏捷" else sub_v
+                elif k == "wisd":
+                    main_v = (main_v or 0) + extra[k] if op.main_attr == "智识" else main_v
+                    sub_v = (sub_v or 0) + extra[k] if op.sub_attr == "智识" else sub_v
+                else:
+                    main_v = (main_v or 0) + extra[k] if op.main_attr == "意志" else main_v
+                    sub_v = (sub_v or 0) + extra[k] if op.sub_attr == "意志" else sub_v
         return dmgmod.effective_atk(row.get("atk", 0.0), main_v or 0, sub_v or 0,
                                     w_atk)
 
@@ -365,10 +383,64 @@ class Battle:
                 self.log.append({"frame": frame, "kind": "stagger", "op": None,
                                  "label": "敌人失衡", "damage": 0.0})
 
+
+    # ------------------------------------------------------------ 天赋/潜能
+
+    _ATTR_MAIN = {39: "str", 40: "agi", 41: "wisd", 42: "will"}
+    _ATTR_DMG = {17, 28, 29, 32, 33, 50, 51, 52, 53, 54, 55, 61,
+                 64, 65, 66, 67, 68, 69}
+
+    def _build_mods(self) -> dict:
+        """把天赋/潜能里**无条件**的数值修正整理成 {cid: {...}}。
+
+        只取 `activeCondition` 为空的条目（无条件的常驻加成），
+        条件型（叠层/血量/状态）暂不施加，避免高估。
+        """
+        out: dict[str, dict] = {}
+        for cid in self.ids:
+            op = self.ops[cid]
+            mods = op.mods or {}
+            attrs: dict[str, float] = {}
+            dmg = 0.0
+            ai = 0.0
+            applied: list[str] = []
+
+            def take(entries, tag):
+                nonlocal dmg, ai
+                for e in entries or []:
+                    if e.get("conditional"):
+                        continue
+                    if e.get("kind") != "attr":
+                        continue
+                    a = e.get("attr"); v = float(e.get("value") or 0)
+                    if a in self._ATTR_MAIN:
+                        k = self._ATTR_MAIN[a]
+                        attrs[k] = attrs.get(k, 0.0) + v
+                        applied.append(f"{tag}:{k}+{v:g}")
+                    elif a == 87:
+                        ai += v
+                        applied.append(f"{tag}:AI+{v:g}")
+                    elif a in self._ATTR_DMG:
+                        dmg += v
+                        applied.append(f"{tag}:DMG+{v:.1%}")
+
+            for tal, levels in (mods.get("talents") or {}).items():
+                if not levels:
+                    continue
+                lv = str(max(int(x) for x in levels))
+                take(levels.get(lv), f"T{tal}")
+            for k in range(1, int(self.sc.potential_level) + 1):
+                take((mods.get("potentials") or {}).get(str(k)), f"P{k}")
+
+            out[cid] = {"attrs": attrs, "dmg_bonus": dmg, "ai": ai,
+                        "applied": applied}
+        return out
+
     def _ai(self, cid: str) -> float:
         """源石技艺强度（attrType 87）。"""
         row = self.ops[cid].stat_at(self.sc.level)
-        return float(row.get("arts_intensity") or 0.0)
+        return (float(row.get("arts_intensity") or 0.0)
+                + float((self.mod.get(cid) or {}).get("ai", 0.0)))
 
     def _hit_damage(self, cid: str, mult: float, element: str | None,
                     frame: int, *, apply_status: bool = True) -> float:
@@ -379,6 +451,7 @@ class Battle:
         if apply_status:
             res = max(0.0, res - self.rx.res_shred(frame) / 100.0)
         d = atk * mult
+        d *= 1.0 + float((self.mod.get(cid) or {}).get("dmg_bonus", 0.0))
         d *= 100.0 / (max(0.0, self.sc.enemy_def) + 100.0)
         d *= max(0.0, 1.0 - res)
         if self.staggered_until > frame:

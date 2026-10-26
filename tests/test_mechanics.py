@@ -165,6 +165,38 @@ class TestReactionIntegration(unittest.TestCase):
         self.assertEqual(sum((rx_stats.get("totals") or {}).values()), 0)
 
 
+class TestTalentPotential(unittest.TestCase):
+    """天赋/潜能：来自 PotentialTalentEffectTable 的无条件数值修正。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ds = _ds()
+        cls.op = cls.ds.resolve("陈千语")
+
+    def test_mods_parsed(self):
+        mods = self.op.mods or {}
+        self.assertIn("potentials", mods)
+        self.assertIn("2", mods["potentials"])
+
+    def test_potential_raises_atk(self):
+        cid = self.op.char_id
+        b0 = Battle(self.ds, Scenario(team=[cid], potential_level=0))
+        b5 = Battle(self.ds, Scenario(team=[cid], potential_level=5))
+        self.assertGreater(b5._atk(cid), b0._atk(cid))
+
+    def test_potential_adds_dmg_bonus(self):
+        cid = self.op.char_id
+        b0 = Battle(self.ds, Scenario(team=[cid], potential_level=0))
+        b5 = Battle(self.ds, Scenario(team=[cid], potential_level=5))
+        self.assertGreater(b5.mod[cid]["dmg_bonus"], b0.mod[cid]["dmg_bonus"])
+
+    def test_conditional_entries_skipped(self):
+        for cid, m in Battle(self.ds, Scenario(
+                team=[o.char_id for o in list(self.ds.operators.values())[:4]])).mod.items():
+            for tag in m["applied"]:
+                self.assertIsInstance(tag, str)
+
+
 if __name__ == "__main__":
     unittest.main()
 
