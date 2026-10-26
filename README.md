@@ -1,9 +1,9 @@
-# 随心配（Suixinpei）· v3.2.0
+# 随心配（Suixinpei）· v3.3.0
 
 《明日方舟：终末地》的**自动配队 + 输出轴**桌面工具。
 
 界面按**终末地官网的设计语言**做的：奶油纸底、墨黑字、信号黄强调、全直角工业编辑风；
-图标是埃特拉（Estella）的 Q 版大头，用 `tools/make_icon.py` 生成。
+图标是生图 AI 出的 Q 版大头（内置资产，见 `desktop/assets/ICON.md`）。
 
 给定「必须包含 / 禁止包含 / 可选池 / 战斗场景」，输出：
 
@@ -26,7 +26,7 @@
 
 ### 方式 A：下载桌面版（推荐）
 
-从 Releases 下载 `suixinpei-3.2.0-win64.zip`，解压后双击：
+从 Releases 下载 `suixinpei-3.3.0-win64.zip`，解压后双击：
 
 ```
 随心配.exe

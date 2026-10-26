@@ -241,6 +241,60 @@ td{font-family:var(--mono);font-size:10.5px}
 /* 桌面标题栏（不再使用，保留兼容） */
 .tb{display:none}
 
+
+/* ---------- v3.3：学官网的卡片 / 药丸 / 黄块 / 彩虹线 ---------- */
+.topline{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;
+  margin:0 0 18px;position:relative;z-index:1}
+.hero{display:flex;align-items:baseline;gap:12px;margin:0}
+.hero .tag{background:var(--yellow);color:var(--ink);font-size:34px;font-weight:600;
+  padding:3px 14px;letter-spacing:.02em;line-height:1.15}
+.hero .sub{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--ink)}
+.hero .meta{font-family:var(--mono);font-size:10px;color:var(--muted);margin-left:4px}
+.tools{display:flex;gap:8px;align-items:center}
+.tools input,.tools select{background:var(--ink);color:#fff;border:0;border-radius:999px;
+  padding:7px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;
+  -moz-appearance:textfield}
+.tools input[type=number]{width:58px;text-align:center}
+.tools select{appearance:none;padding-right:28px;cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,#fff 50%),
+                   linear-gradient(135deg,#fff 50%,transparent 50%);
+  background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%;
+  background-size:5px 5px;background-repeat:no-repeat}
+.tools button{border-radius:999px;background:var(--ink);color:#fff;border:0;
+  padding:7px 18px;font-weight:600;font-size:12px;display:flex;gap:8px;align-items:center}
+.tools button::before{content:"";width:8px;height:8px;background:var(--yellow);
+  display:inline-block}
+.tools .icon{border-radius:10px;padding:7px 11px}
+.tools .icon::before{display:none}
+#main{position:relative}
+#main::before{content:"SQUAD";position:absolute;left:14px;top:-42px;
+  font:700 132px/1 var(--font);letter-spacing:-.05em;color:transparent;
+  -webkit-text-stroke:1px rgba(16,17,16,.07);pointer-events:none;z-index:0}
+.card{border-radius:2px;overflow:hidden}
+.card::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;z-index:3;
+  background:linear-gradient(90deg,#ff5a5a,#ffb020,#ffe500,#4ade80,#38bdf8,#a78bfa)}
+.op{border-radius:2px}
+.op .idx{margin-left:auto;font-family:var(--mono);font-size:9px;color:#8b8f8a}
+.op .el{width:7px;height:7px;border-radius:50%;background:var(--el,#888);flex:0 0 auto}
+.op.must .idx{color:#3a3a00}
+.op.must .el{box-shadow:0 0 0 1px var(--ink)}
+.op::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;opacity:0;
+  background:linear-gradient(90deg,#ff5a5a,#ffb020,#ffe500,#4ade80,#38bdf8,#a78bfa)}
+.op:hover::after,.op.must::after{opacity:1}
+.op .st{display:none}
+
+/* 详情：文字详情页的处理 */
+details{background:var(--card);border:1px solid var(--line);border-radius:3px;
+  padding:8px 12px;margin-top:12px}
+summary{display:inline-flex;gap:8px;align-items:center;font-family:var(--mono);
+  font-size:10px;letter-spacing:.12em;color:var(--muted)}
+summary:hover{color:var(--ink)}
+details[open] summary{color:var(--ink)}
+details table{margin-top:10px;border:1px solid var(--line)}
+details th{background:var(--ink);color:#fff;border-color:var(--ink)}
+details td{border-color:var(--line)}
+details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em;
+  color:var(--muted);margin:10px 0 2px;text-transform:uppercase}
 </style>
 </head>
 <body>
@@ -258,29 +312,28 @@ td{font-family:var(--mono);font-size:10.5px}
   <aside id="side">
     <div class="row"><input id="q" type="text" placeholder="搜索干员" /></div>
     <div class="elems" id="elems"></div>
-    <div class="row">
-      <input id="dur" type="number" value="40" style="width:42px" title="时间窗口（秒）"/>
-      <select id="eprofile" title="敌人出手节奏" style="flex:1;padding:5px 6px">
-        <option value="normal">8s</option>
-        <option value="slow">12s</option>
-        <option value="fast">5s</option>
-        <option value="burst">4s</option>
-      </select>
-      <input id="top" type="number" value="3" style="width:34px" title="Top N"/>
-    </div>
-    <div class="row">
-      <button id="go" style="flex:1">推荐</button>
-      <button id="clr" class="ghost" title="清空" style="padding:6px 10px">✕</button>
-    </div>
     <div id="ops"></div>
   </aside>
 
   <section id="main">
-    <div class="hero">
-      <b>配队</b>
-      <span>SQUAD</span>
-      <span class="sp"></span>
-      <span class="meta" id="hero-meta"></span>
+    <div class="topline">
+      <div class="hero">
+        <span class="tag">配队</span>
+        <span class="sub">// SQUAD</span>
+        <span class="meta" id="hero-meta"></span>
+      </div>
+      <div class="tools">
+        <input id="dur" type="number" value="40" title="时间窗口（秒）"/>
+        <select id="eprofile" title="敌人出手节奏">
+          <option value="normal">敌 8s</option>
+          <option value="slow">敌 12s</option>
+          <option value="fast">敌 5s</option>
+          <option value="burst">敌 4s</option>
+        </select>
+        <input id="top" type="number" value="3" title="Top N"/>
+        <button id="go">推荐</button>
+        <button id="clr" class="icon" title="清空">✕</button>
+      </div>
     </div>
     <div id="result">选择干员</div>
   </section>
@@ -481,6 +534,10 @@ function renderOps(){
       const row = el('div','op' + (STATE[o.id]===1?' must':STATE[o.id]===2?' ban':''));
       row.appendChild(avatar(o, 30));
       row.appendChild(el('span','nm', o.name));
+      const dot = el('span','el');
+      dot.style.setProperty('--el', ELEM_COLOR[o.element] || '#888');
+      row.appendChild(dot);
+      row.appendChild(el('span','idx', String(box.children.length + 1).padStart(2,'0')));
       row.onclick = () => { STATE[o.id] = (STATE[o.id]+1)%3; renderOps(); };
       row.title = `${o.name} · ${o.profession || ''} · ${o.element || ''}`
         + (o.note ? '\n' + o.note : '');
