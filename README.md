@@ -1,4 +1,4 @@
-# 终末地配队模拟（Endfield Team Sim）· v2.4.0
+# 终末地配队模拟（Endfield Team Sim）· v2.4.1
 
 《明日方舟：终末地》的**自动配队 + 输出轴**工具。
 
@@ -23,7 +23,7 @@
 
 ### 方式 A：下载发行版（推荐给只想起用的）
 
-从 Releases 下载 `endfield-team-sim-2.4.0-win64.zip`，解压后双击：
+从 Releases 下载 `endfield-team-sim-2.4.1-win64.zip`，解压后双击：
 
 ```
 endfield-server.exe

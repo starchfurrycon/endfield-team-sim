@@ -138,6 +138,7 @@ def start_build(verbose: bool = False) -> None:
 
 def meta() -> dict:
     ds = dataset()
+    from ..data import curated as curated_mod
     # 同一中文名可能有多份客户端数据（管理员 男/女/占位），UI 只该看到一个人，
     # 取技能数据最全的那份当代表，其余列进 variants 供"知道有分版"。
     groups: dict[str, list] = {}
@@ -171,6 +172,7 @@ def meta() -> dict:
             "hit_dependent": (op.semantics or {}).get("has_hit_dependent_skill"),
             "avatar": (config.AVATARS / f"{op.char_id}.png").is_file(),
             "variants": variants,
+            "note": (curated_mod.spec_for(op.char_id) or {}).get("note"),
         })
     return {"version": ds.version, "count": len(ops), "operators": ops,
             "app_version": __version__,

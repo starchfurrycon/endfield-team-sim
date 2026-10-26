@@ -153,15 +153,17 @@
   <aside id="side">
     <div class="row"><input id="q" type="text" placeholder="搜索" /></div>
     <div class="elems" id="elems"></div>
-    <div class="row">
-      <input id="dur" type="number" value="40" style="width:52px" title="窗口（秒）"/>
+    <div class="row" style="flex-wrap:wrap">
+      <span class="muted">窗口</span>
+      <input id="dur" type="number" value="40" style="width:46px" title="窗口（秒）"/>
       <select id="eprofile" title="敌人出手节奏">
         <option value="normal">敌 8s</option>
         <option value="slow">敌 12s</option>
         <option value="fast">敌 5s</option>
         <option value="burst">敌 4s</option>
       </select>
-      <input id="top" type="number" value="3" style="width:38px" title="Top N"/>
+      <span class="muted">Top</span>
+      <input id="top" type="number" value="3" style="width:36px" title="Top N"/>
       <button id="clr" class="ghost" title="清空" style="padding:4px 8px">✕</button>
     </div>
     <div class="row"><button id="go" style="flex:1">推荐</button></div>
@@ -235,7 +237,8 @@ function avatar(opOrId, size, name){
     wrap.appendChild(img);
   }
   wrap.title = nm + (op && op.profession ? ' · ' + op.profession : '')
-    + (op && op.element ? ' · ' + op.element : '');
+    + (op && op.element ? ' · ' + op.element : '')
+    + (op && op.note ? '\n' + op.note : '');
   return wrap;
 }
 
@@ -318,7 +321,8 @@ function renderOps(){
       row.appendChild(avatar(o, 30));
       row.appendChild(el('span','nm', o.name));
       row.onclick = () => { STATE[o.id] = (STATE[o.id]+1)%3; renderOps(); };
-      row.title = `${o.name} · ${o.profession || ''} · ${o.element || ''}`;
+      row.title = `${o.name} · ${o.profession || ''} · ${o.element || ''}`
+        + (o.note ? '\n' + o.note : '');
       box.appendChild(row);
     });
 }
