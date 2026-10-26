@@ -1,12 +1,15 @@
 {
-  "name": "endfield-team-sim-desktop",
-  "version": "2.5.0",
+  "name": "endfield-sim",
+  "productName": "终末地配队模拟",
+  "version": "3.0.0",
   "private": true,
-  "description": "终末地配队模拟 · 桌面壳（Electron）",
+  "description": "Endfield squad simulator desktop shell",
   "main": "main.js",
+  "author": "starchfurrycon",
+  "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "start:nodl": "electron ."
+    "start:dev": "electron ."
   },
   "devDependencies": {
     "electron": "^33.0.0"

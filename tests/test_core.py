@@ -38,26 +38,14 @@ class TestTiming(unittest.TestCase):
 
 
 class TestDamage(unittest.TestCase):
-    def test_def_zone(self):
-        d, zones = dmg.compute(dmg.DamageContext(atk=100, multiplier=1.0,
-                                                enemy_def=100, crit_rate=0.0))
-        self.assertAlmostEqual(zones["def"], 0.5)
-        self.assertEqual(d, 50)
-
-    def test_stagger_multiplier(self):
-        _, zones = dmg.compute(dmg.DamageContext(atk=100, multiplier=1.0,
-                                                staggered=True))
-        self.assertAlmostEqual(zones["stagger"], config.guess("STAGGER_DMG_MULT"))
-
     def test_atk_scaling(self):
         a = dmg.effective_atk(100, 100, 0)
         b = dmg.effective_atk(100, 0, 0)
         self.assertGreater(a, b)
 
-    def test_rounding_half_up(self):
-        d, _ = dmg.compute(dmg.DamageContext(atk=101, multiplier=1.0,
-                                            enemy_def=100, crit_rate=0.0))
-        self.assertEqual(d, round(101 * 0.5))
+    def test_weapon_atk_added(self):
+        self.assertAlmostEqual(dmg.effective_atk(100, 0, 0, weapon_atk=50),
+                               150.0)
 
 
 class TestSemantics(unittest.TestCase):

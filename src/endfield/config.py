@@ -24,6 +24,11 @@ else:
     ROOT = Path(__file__).resolve().parents[2]
     APP_HOME = ROOT
 
+# 桌面壳可以指定数据根目录（便携版把 data 放在 exe 旁边，而不是 resources 里）
+_env_home = os.environ.get("EF_HOME")
+if _env_home:
+    APP_HOME = Path(_env_home).expanduser().resolve()
+
 DATA = APP_HOME / "data"
 RAW = DATA / "raw"
 NORM = DATA / "normalized"
@@ -31,10 +36,11 @@ REPORTS = DATA / "reports"
 EXPORTS = APP_HOME / "exports"
 LLM_CACHE = DATA / "llm"
 AVATARS = DATA / "avatars"
+LOGS = DATA / "logs"
 
 
 def ensure_dirs() -> None:
-    for p in (RAW, NORM, REPORTS, LLM_CACHE, AVATARS):
+    for p in (RAW, NORM, REPORTS, LLM_CACHE, AVATARS, LOGS):
         p.mkdir(parents=True, exist_ok=True)
 
 
@@ -76,14 +82,6 @@ SCHEMA_VERSION = 6
 
 FPS = 30                      # 帧率：社区对 626 条动画的换算验证（见调研 §2.2）
 FRAME_MS = 1000.0 / FPS
-
-
-def frames_to_s(f: float) -> float:
-    return round(f / FPS, 3)
-
-
-def s_to_frames(s: float) -> int:
-    return int(round(s * FPS))
 
 
 # ---------------------------------------------------------------- 属性 id

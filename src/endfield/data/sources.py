@@ -9,9 +9,7 @@
 from __future__ import annotations
 
 import json
-import time
 import urllib.request
-from pathlib import Path
 
 from .. import config
 
@@ -45,14 +43,6 @@ def wiki_siteinfo() -> dict:
     return _api(url)
 
 
-def wiki_generator() -> str | None:
-    try:
-        info = wiki_siteinfo()
-        return info.get("query", {}).get("general", {}).get("generator")
-    except Exception:  # noqa: BLE001
-        return None
-
-
 SOURCE_META = {
     "github": {
         "name": "rmxlinux/EndfieldData",
@@ -80,11 +70,3 @@ SOURCE_META = {
         "license": "CC BY-NC-SA（BWIKI 惯例）；仅作语义来源",
     },
 }
-
-
-def stamp(path: Path, ref: str) -> dict:
-    return {
-        "ref": ref,
-        "captured_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "path": str(path),
-    }

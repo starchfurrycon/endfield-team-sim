@@ -727,27 +727,6 @@ class Battle:
             total += base * scale
         return total if total else sk.total_multiplier(self.sc.skill_level)
 
-    def _bb_scale(self, cid: str, sk) -> float:
-        """天赋/潜能对技能黑板倍率的修正（如 战技倍率 ×1.1）。"""
-        entries = (self.mod.get(cid) or {}).get("bb") or []
-        if not entries:
-            return 1.0
-        keys = {h.key for h in sk.timing.hits if h.key}
-        # 同一 (key, skillId) 的多条记录是重复登记，取最大值而不是连乘
-        best: dict[tuple[str, str], float] = {}
-        for e in entries:
-            sid = e.get("skill_id") or ""
-            if sid and sid != sk.skill_id:
-                continue          # 只作用于指定技能
-            if e["key"] not in keys:
-                continue
-            k = (e["key"], sid)
-            best[k] = max(best.get(k, 1.0), float(e["value"]))
-        factor = 1.0
-        for v in best.values():
-            factor *= v
-        return factor
-
     def _ai(self, cid: str) -> float:
         """源石技艺强度（attrType 87）。"""
         row = self.ops[cid].stat_at(self.sc.level)

@@ -1,6 +1,6 @@
-# 终末地配队模拟（Endfield Team Sim）· v2.4.2
+# 终末地配队模拟（Endfield Team Sim）· v3.0.0
 
-《明日方舟：终末地》的**自动配队 + 输出轴**工具。
+《明日方舟：终末地》的**自动配队 + 输出轴**桌面工具，界面按终末地的黑/黄工业风重做。
 
 给定「必须包含 / 禁止包含 / 可选池 / 战斗场景」，输出：
 
@@ -21,26 +21,27 @@
 
 ## 快速开始
 
-### 方式 A：下载发行版（推荐给只想起用的）
+### 方式 A：下载桌面版（推荐）
 
-从 Releases 下载 `endfield-team-sim-2.4.2-win64.zip`，解压后双击：
+从 Releases 下载 `EndfieldSim-3.0.0-win64.zip`，解压后双击：
 
 ```
-endfield-server.exe
+EndfieldSim.exe
 ```
 
-首次启动会**在后台从社区数据仓构建数据集**（需要联网，约 1~3 分钟）——
-窗口里会显示**构建进度条**（阶段、百分比、已用时间），完成后自动进入界面。
+首次启动会在后台下载游戏数据并构建（需要联网，约 1~3 分钟），
+窗口里显示 `INITIALIZING` 进度；完成后自动进入配队界面。
 
-> 之后每次启动都会直接复用本地数据；想更新游戏版本时删掉 `data/` 重开即可。
->
-> 从 v2.3 升级：删掉 `data/` 重新构建一次，才会拿到头像与武器/装备中文名。
+> 数据在程序同目录的 `data/`（日志 `data/logs/server.log`）。
+> 想更新游戏版本：删掉 `data/` 重开。
+> 想换端口/数据目录：设置 `EF_PORT` / `EF_HOME`。
 
 ### 方式 B：从源码运行
 
 ```bash
 python run.py update    # 一条命令更新数据：sync → build → 自检
-python run.py serve --port 8777        # 本地 UI
+python run.py serve --port 8777        # 浏览器 UI（无桌面壳）
+python run.py llm --test               # 测试已配置的 LLM API
 
 python run.py sync      # 只刷新数据源
 python run.py build     # 只重建数据集
@@ -51,13 +52,15 @@ python run.py axis --team 陈千语,佩丽卡,昼雪,余烬 --mode both --durati
 python run.py axis --team 陈千语 --equip output --weapon 1   # 带装备/武器预设
 ```
 
-桌面窗口（Electron）：
+桌面壳（开发模式）：
 
 ```bat
 cd desktop
 npm install            :: 卡住就设 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
-start.cmd
+npm start              :: 需要本机 Python
 ```
+
+打包桌面版：`python tools/package_desktop.py`（需要本机已装 electron 与 rcedit）。
 
 Python 3.10+，**无第三方依赖**（仅标准库）。
 
@@ -65,7 +68,8 @@ Python 3.10+，**无第三方依赖**（仅标准库）。
 
 ## 界面
 
-- **头像化**：干员列表、队伍卡、水位轨、对比视图都用头像 + 数字，少看文字
+- **Endfield 风格**：黑底 + 终末地黄、切角面板、Latin 微标签、自定义标题栏
+- **头像化**：干员列表、队伍卡、水位轨、对比视图都用头像 + 数字
 - 点干员：**一次 = 必须包含，两次 = 禁止，三次 = 清除**；顶部色点按元素过滤
 - 每张卡切换**冷 / 热**两条轴；轴是**甘特图**（白竖线 = 命中帧）
 - **水位轨**：技力与每人终结技能量曲线，悬停读数
@@ -73,6 +77,7 @@ Python 3.10+，**无第三方依赖**（仅标准库）。
 - **装备/武器推荐**：每人 3 把武器 + 2 套装备（输出向 / 功能向）
 - 细节（动作表 / 警告 / 未建模项）收进卡片的 `ⓘ`
 - 首次启动有**构建进度**，失败可重试
+- 工程结构与状态机见 [`ARCHITECTURE.md`](ARCHITECTURE.md)
 
 ---
 

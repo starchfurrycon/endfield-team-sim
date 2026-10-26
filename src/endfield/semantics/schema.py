@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 TRIGGERS = [
@@ -106,6 +105,3 @@ def validate_semantics(obj: dict) -> tuple[bool, list[str]]:
         errs.append("evidence must be array[str]")
     return (not errs), errs
 
-
-def dump_schema() -> str:
-    return json.dumps(SEMANTICS_SCHEMA, ensure_ascii=False, indent=1)

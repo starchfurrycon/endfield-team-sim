@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 
 from .. import config
@@ -86,34 +85,3 @@ def explain_rotation(res: Result, ds: Dataset | None) -> str:
     main_line = f"伤害主要来自 {'、'.join(names)}。" if names else ""
     return f"{head}。{main_line}"
 
-
-def llm_polish(text: str, payload: dict) -> str:
-    """可选：让 LLM 润色，但数字以注入的结构化结果为准。"""
-    key = os.environ.get("ENDFIELD_LLM_API_KEY")
-    if not key:
-        return text
-    try:
-        import urllib.request
-        base = (os.environ.get("ENDFIELD_LLM_BASE")
-                or "https://api.deepseek.com/v1").rstrip("/")
-        model = os.environ.get("ENDFIELD_LLM_MODEL") or "deepseek-chat"
-        body = {
-            "model": model, "temperature": 0.2,
-            "messages": [
-                {"role": "system",
-                 "content": "你是终末地配队顾问。把给定的战斗结果改写成简洁中文建议。"
-                            "禁止改动任何数字，禁止编造数据中没有的数值。"},
-                {"role": "user", "content": json.dumps(
-                    {"facts": payload, "draft": text}, ensure_ascii=False)},
-            ],
-        }
-        req = urllib.request.Request(
-            base + "/chat/completions",
-            data=json.dumps(body).encode(),
-            headers={"Content-Type": "application/json",
-                     "Authorization": f"Bearer {key}"}, method="POST")
-        with urllib.request.urlopen(req, timeout=60) as r:
-            resp = json.loads(r.read().decode())
-        return resp["choices"][0]["message"]["content"]
-    except Exception:  # noqa: BLE001
-        return text

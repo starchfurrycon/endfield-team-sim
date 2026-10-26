@@ -105,11 +105,6 @@ def _text(node) -> str | None:
     return None
 
 
-def _hi(it: int | None) -> float:
-    lv = max(1, min(int(it or 1), 90))
-    return 1.0 + (lv - 1) / 196.0
-
-
 def _class_name(node) -> str:
     """'Beyond.Gameplay.Core.DamageAction+DamageActionData, Gameplay.Beyond'
     -> 'DamageAction'"""

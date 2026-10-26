@@ -54,11 +54,6 @@ class GithubSource:
             f"{config.GITHUB_RAW}/{self.repo}/{ref}/{relpath}",
         ]
 
-    def raw_url(self, relpath: str) -> str:
-        return self.raw_urls(relpath)[0]
-
-    # ------------------------------------------------------------ 取数
-
     def _get(self, relpath: str, force: bool = False) -> bytes:
         return http.fetch_any(self.raw_urls(relpath), self.root / relpath,
                               root=self.root, force=force)
@@ -66,12 +61,6 @@ class GithubSource:
     def table(self, name: str, force: bool = False) -> dict:
         body = self._get(f"TableCfg/{name}", force=force)
         return json.loads(body.decode("utf-8"))
-
-    def table_optional(self, name: str) -> dict | None:
-        try:
-            return self.table(name)
-        except Exception:  # noqa: BLE001
-            return None
 
     def skill(self, skill_id: str, force: bool = False) -> dict | None:
         rel = f"Json/SkillData/{skill_id}.json"

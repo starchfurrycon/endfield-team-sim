@@ -139,9 +139,6 @@ class Skill:
             total = self._resolve_mult(l.multipliers, "atk_scale")
         return total
 
-    def hp_hit_count(self) -> int:
-        return len([h for h in self.timing.hits if h.damage_type in (0, None)])
-
     def to_dict(self) -> dict:
         d = asdict(self)
         d["timing"] = self.timing.to_dict()

@@ -1,5 +1,46 @@
 # Changelog
 
+## v3.0.0 (2026-10-26)
+
+**桌面软件化 + Endfield 风格界面 + 状态机闭环 + 架构清理。**
+
+### 新增
+
+- **Endfield 风格界面**：黑底 / 终末地黄 / 切角面板 / Latin 微标签 / 自定义标题栏；
+  甘特、水位、贡献条、按钮、弹窗全部重绘；保留 v2.4 的「头像 + 数字、少文字」方向。
+- **桌面应用（Electron）**：`EndfieldSim.exe` 单目录便携版。
+  - 自带 `resources/server/endfield-server.exe`，**不需要用户装 Python**；
+  - 启动状态机 `starting → server_up → page_loaded`，失败显示日志尾部；
+  - 窗口用原生 overlay 标题栏（可拖动 + 系统按钮），任务栏图标 / exe 图标与版本信息；
+  - 端口自动挑选（可用 `EF_PORT` 覆盖）、数据目录 `EF_HOME`（默认 exe 旁边）；
+  - 单实例锁、退出杀进程树、后端日志写 `data/logs/server.log`。
+- **打包脚本** `tools/package_desktop.py`：组装 Electron 运行时 + 随包后端 + 图标/版本号，
+  裁掉多余 locale，产出 238MB 目录（zip ~100MB）。
+- **架构拆分** `web/`：`state.py`（状态机）/ `jobs.py`（后台任务）/ `api.py`（纯端点）/
+  `server.py`（只做路由）。见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
+- **状态机闭环**：数据 `idle→building→ready/error`，LLM `idle→running→done/error`；
+  不变量（单任务、进度只在 building、LLM 需 ready、完成失效缓存、事件日志）都有单测。
+
+### 清理
+
+- 删除死代码：`damage.compute/DamageContext/expected_crit`（引擎已内联结算）、
+  `explain.llm_polish`（被 semantics/llm 取代）、`schema.dump_schema`、
+  `github.raw_url/table_optional`、`http.fetch_json/cached_json`、
+  `sources.wiki_generator/stamp`、`battle._bb_scale`、`model.hp_hit_count`、
+  `config.frames_to_s/s_to_frames`。
+- 清理 4 个带 BOM 的 Python 文件（统一 UTF-8 无 BOM）。
+- `server.py` 从 579 行降到路由层；`ensure_dataset` 等旧入口删除。
+
+### 兼容
+
+- `/api/status` 字段保持（新增 `llm_run` 与 `events`）；`/api/llm` 不返回明文密钥。
+- 旧浏览器模式仍可用：`python run.py serve --port 8777`。
+
+### 测试
+
+128 项（新增 11 项状态机测试：转移、守卫、重试、事件、缓存失效）。
+
+
 ## v2.5.0 (2026-10-26)
 
 **LLM 自更新**：游戏更新后，新技能文本的机制含义（触发条件 / 元素 / 异常 / 定位）

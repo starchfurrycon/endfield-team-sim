@@ -1,4 +1,4 @@
-﻿"""覆盖率与漂移报告。"""
+"""覆盖率与漂移报告。"""
 
 from __future__ import annotations
 

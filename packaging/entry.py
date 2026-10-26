@@ -1,4 +1,4 @@
-﻿"""PyInstaller 入口：启动本地 UI 服务。
+"""PyInstaller 入口：启动本地 UI 服务。
 打包：python -m PyInstaller --onefile --name endfield-server packaging/entry.py
 """
 import sys

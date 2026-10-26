@@ -152,17 +152,21 @@ class TestStatus(unittest.TestCase):
         self.assertIn(st["state"], ("idle", "building", "ready", "error"))
 
     def test_ready_reflects_state(self):
-        old = dict(server.BUILD)
+        from endfield.web import state as web_state
+        st_obj = web_state.STATE
+        old = st_obj.data
         try:
-            server.BUILD.update(state="building", percent=42)
+            st_obj.begin_build()
+            st_obj.build_progress(42, "构建中")
             st = server.status()
             self.assertFalse(st["ready"])
             self.assertEqual(st["percent"], 42)
-            server.BUILD.update(state="ready", percent=100)
-            self.assertTrue(server.status()["ready"])
+            st_obj.build_done("test-version")
+            st = server.status()
+            self.assertTrue(st["ready"])
+            self.assertEqual(st["version"], "test-version")
         finally:
-            server.BUILD.clear()
-            server.BUILD.update(old)
+            st_obj.data = old
 
 
 class TestEnemyProfile(unittest.TestCase):

@@ -36,7 +36,8 @@ def _ds() -> Dataset:
 class TestMetaDedup(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        server.BUILD.update(state="ready", percent=100)
+        from endfield.web import state as web_state
+        web_state.STATE.mark_ready("test")
         cls.meta = server.meta()
 
     def test_no_duplicate_names(self):
@@ -77,7 +78,8 @@ class TestAvatarRoute(unittest.TestCase):
         cls.ds = _ds()
         cls.cid = next(iter(cls.ds.operators))
         cls.has_avatar = (config.AVATARS / f"{cls.cid}.png").is_file()
-        server.BUILD.update(state="ready", percent=100)
+        from endfield.web import state as web_state
+        web_state.STATE.mark_ready("test")
         cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
         cls.port = cls.httpd.server_address[1]
         threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
@@ -176,14 +178,15 @@ class TestNewOperatorPipeline(unittest.TestCase):
         op.skills = {}
         ds.operators[op.char_id] = op
         # 没技能不该让 meta / 推荐炸掉（会被 meta 过滤掉）
-        prev = dict(server._CACHE)
-        server._CACHE.update(ds=ds, ts=__import__("time").time())
+        from endfield.web import state as web_state
+        prev = dict(web_state.STATE._cache)
+        web_state.STATE._cache.update(ds=ds, ts=__import__("time").time())
         try:
             m = server.meta()
             self.assertNotIn("无文本干员", [o["name"] for o in m["operators"]])
         finally:
-            server._CACHE.clear()
-            server._CACHE.update(prev)
+            web_state.STATE._cache.clear()
+            web_state.STATE._cache.update(prev)
 
 
 class TestQualityReport(unittest.TestCase):

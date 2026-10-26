@@ -110,12 +110,3 @@ def fetch(url: str, dest: Path, *, root: Path | None = None,
     return fetch_any([url], dest, root=root, force=force, timeout=timeout,
                      retries=retries, sleep=sleep)
 
-
-def fetch_json(url: str, dest: Path, *, root: Path | None = None,
-               force: bool = False, timeout: float = 60.0) -> object:
-    body = fetch(url, dest, root=root, force=force, timeout=timeout)
-    return json.loads(body.decode("utf-8"))
-
-
-def cached_json(path: Path) -> object:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
