@@ -403,12 +403,21 @@ class Battle:
             attrs: dict[str, float] = {}
             dmg = 0.0
             ai = 0.0
+            bb: list[dict] = []
             applied: list[str] = []
 
             def take(entries, tag):
                 nonlocal dmg, ai
                 for e in entries or []:
                     if e.get("conditional"):
+                        continue
+                    if e.get("kind") == "bb":
+                        k = str(e.get("key") or "")
+                        v = float(e.get("value") or 1.0)
+                        if k and v and v != 1.0:
+                            bb.append({"key": k, "value": v,
+                                       "skill_id": e.get("skill_id") or ""})
+                            applied.append(f"{tag}:{k}×{v:g}")
                         continue
                     if e.get("kind") != "attr":
                         continue
@@ -433,8 +442,57 @@ class Battle:
                 take((mods.get("potentials") or {}).get(str(k)), f"P{k}")
 
             out[cid] = {"attrs": attrs, "dmg_bonus": dmg, "ai": ai,
-                        "applied": applied}
+                        "bb": bb, "applied": applied}
         return out
+
+
+
+    def _scaled_mult(self, cid: str, sk) -> float:
+        """按"逐命中 key"缩放倍率：天赋只能乘在该 key 上，不能乘在总和上。"""
+        lv = sk.level(self.sc.skill_level)
+        if not lv:
+            return sk.total_multiplier(self.sc.skill_level)
+        entries = (self.mod.get(cid) or {}).get("bb") or []
+        total = 0.0
+        for h in sk.timing.hits:
+            if h.damage_type not in (0, None):
+                continue
+            base = sk._resolve_mult(lv.multipliers, h.key)
+            scale = 1.0
+            best: dict[tuple[str, str], float] = {}
+            for e in entries:
+                sid = e.get("skill_id") or ""
+                if sid and sid != sk.skill_id:
+                    continue
+                if e["key"] != h.key:
+                    continue
+                k = (e["key"], sid)
+                best[k] = max(best.get(k, 1.0), float(e["value"]))
+            for v in best.values():
+                scale *= v
+            total += base * scale
+        return total if total else sk.total_multiplier(self.sc.skill_level)
+
+    def _bb_scale(self, cid: str, sk) -> float:
+        """天赋/潜能对技能黑板倍率的修正（如 战技倍率 ×1.1）。"""
+        entries = (self.mod.get(cid) or {}).get("bb") or []
+        if not entries:
+            return 1.0
+        keys = {h.key for h in sk.timing.hits if h.key}
+        # 同一 (key, skillId) 的多条记录是重复登记，取最大值而不是连乘
+        best: dict[tuple[str, str], float] = {}
+        for e in entries:
+            sid = e.get("skill_id") or ""
+            if sid and sid != sk.skill_id:
+                continue          # 只作用于指定技能
+            if e["key"] not in keys:
+                continue
+            k = (e["key"], sid)
+            best[k] = max(best.get(k, 1.0), float(e["value"]))
+        factor = 1.0
+        for v in best.values():
+            factor *= v
+        return factor
 
     def _ai(self, cid: str) -> float:
         """源石技艺强度（attrType 87）。"""
@@ -585,7 +643,7 @@ class Battle:
         if commit > MAX_COMMIT_FRAMES:
             commit = MAX_COMMIT_FRAMES
         atk = self._atk(cid)
-        mult = sk.total_multiplier(self.sc.skill_level)
+        mult = self._scaled_mult(cid, sk)
         element = sk.element or op.element
         hits = [h for h in (sk.timing.hit_frames or [commit]) if 0 < h <= commit]
         if not hits:

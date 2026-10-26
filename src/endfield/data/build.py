@@ -517,7 +517,9 @@ def _collect_mods(cid: str, teffects: dict, tr) -> dict:
                                 "value": am.get("attrValue"), "conditional": cond})
             if sb.get("bbKey") and sb.get("floatValue") not in (None, 0.0, 1.0):
                 entries.append({"kind": "bb", "key": sb.get("bbKey"),
-                                "value": sb.get("floatValue"), "conditional": cond})
+                                "value": sb.get("floatValue"),
+                                "skill_id": sb.get("skillId") or "",
+                                "conditional": cond})
         if not entries:
             continue
         if m:

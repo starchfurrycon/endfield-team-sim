@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.3.0 (2026-10-26)
+
+把潜能/天赋里的**技能黑板修正**（`skillBbModifier`）接入模型。
+
+### 新增
+
+- 解析 `PotentialTalentEffectTable` 的 `skillBbModifier {skillId, bbKey, floatValue}`
+- 按 **skillId + 黑板 key** 精确缩放倍率（不是乘在总倍率上，否则多段技能会重复放大）
+- 同一 (key, skillId) 的多条记录取最大值而非连乘（表里有重复登记）
+
+效果示例：陈千语潜能 3「战技/连携技/终结技倍率 +10%」→ 三个技能倍率各自 ×1.1，
+终结技不会因为用了两个黑板 key 而变成 ×1.21。
+
+### 测试
+
+57 项（新增 2 项：倍率只作用于目标技能；潜能 0 时不缩放）。
+
+
 ## v1.1.0 (2026-10-26)
 
 按 [Endfield Talos Wiki](https://endfield.wiki.gg) 的机制页把**元素异常**补全到可对表的程度。

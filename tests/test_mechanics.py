@@ -197,6 +197,34 @@ class TestTalentPotential(unittest.TestCase):
                 self.assertIsInstance(tag, str)
 
 
+class TestBlackboardMods(unittest.TestCase):
+    """潜能对技能倍率的修正（skillBbModifier），按 skillId + 黑板 key 精确作用。"""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ds = _ds()
+        cls.op = cls.ds.resolve("陈千语")
+
+    def test_scale_applies_to_target_skill_only(self):
+        cid = self.op.char_id
+        b = Battle(self.ds, Scenario(team=[cid], potential_level=5))
+        for sk in self.op.skills.values():
+            if sk.slot not in ("battle_skill", "combo_skill", "ultimate"):
+                continue
+            base = sk.total_multiplier(7)
+            scaled = b._scaled_mult(cid, sk)
+            if base <= 0:
+                continue
+            self.assertAlmostEqual(scaled / base, 1.1, places=3,
+                                   msg=f"{sk.slot} 应为 +10%")
+
+    def test_no_potential_means_no_scale(self):
+        cid = self.op.char_id
+        b0 = Battle(self.ds, Scenario(team=[cid], potential_level=0))
+        sk = next(s for s in self.op.skills.values() if s.slot == "battle_skill")
+        self.assertAlmostEqual(b0._scaled_mult(cid, sk), sk.total_multiplier(7), places=4)
+
+
 if __name__ == "__main__":
     unittest.main()
 
