@@ -506,9 +506,8 @@ class Battle:
             # 武器被动：wpn_attr_*（属性）/ wpn_sp_attr_*（atk% 等）
             wbb = op.weapon.get("skill_bb") or []
             if wbb:
-                idx = max(0, min(int(self.sc.weapon_skill_level), len(wbb)) - 1)
                 atk_pct = 0.0
-                for k, v in (wbb[idx] or {}).items():
+                for k, v in (wbb[0] or {}).items():
                     if k in ("str", "agi", "wisd", "will"):
                         attrs[k] = attrs.get(k, 0.0) + float(v)
                         applied.append(f"W:{k}+{v:g}")

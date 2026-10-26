@@ -400,18 +400,25 @@ def build(force: bool = False, verbose: bool = True) -> dict:
         )
         w = weapons.get(weapon_id) or {}
         curve = (weapon_curves.get(w.get("levelTemplateId") or "") or {}).get("list") or []
-        wk_bb = [{} for _ in range(9)]
+        # 武器三个词条：满级基质后分别为 9 / 9 / 4 级（0 命）
+        WLEVELS = (9, 9, 4)
+        passive_bb: dict[str, float] = {}
+        idx_skill = 0
         for wsid in (w.get("weaponSkillList") or []):
             if not (wsid.startswith("wpn_attr_") or wsid.startswith("wpn_sp_attr_")):
                 continue
+            cap = WLEVELS[min(idx_skill, 2)]
+            idx_skill += 1
             wrows = patch_by_id.get(wsid) or {}
             for row in wrows.get("SkillPatchDataBundle") or []:
                 lv = int(row.get("level") or 1)
-                slot = wk_bb[min(lv, 9) - 1]
+                if lv != cap:
+                    continue
                 for x in row.get("blackboard") or []:
                     v = float(x.get("value") or 0.0)
                     if v:
-                        slot[x["key"]] = slot.get(x["key"], 0.0) + v
+                        passive_bb[x["key"]] = passive_bb.get(x["key"], 0.0) + v
+        wk_bb = [passive_bb]
         op.weapon = {
             "skill_bb": wk_bb,
             "id": weapon_id,
