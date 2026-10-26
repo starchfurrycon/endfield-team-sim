@@ -24,6 +24,7 @@ from typing import Any
 from .. import config
 from ..model import Dataset, Operator
 from . import damage as dmgmod
+from . import reactions as rxmod
 
 
 # ---------------------------------------------------------------- 输入
@@ -40,7 +41,8 @@ class Scenario:
     enemy_hp: float = 1e12
     attack_interval_frames: int = 240
     start_energy: str = "cold"          # cold | hot
-    weapon_atk: float = 0.0
+    weapon_atk: float = 0.0        # 额外的武器 ATK（覆盖用）
+    weapon_level: int = 80          # 默认武器等级
     main: str | None = None
     seed: int = 0
     # 主控以外的干员会自动普攻（游戏内教学页 wiki_tut_bat_team_1）
@@ -127,7 +129,8 @@ class Battle:
         self.next_enemy_attack: int = sc.attack_interval_frames
         self.total_damage: float = 0.0
         self.per_op: dict[str, float] = {c: 0.0 for c in self.ids}
-        self.pending: list[tuple[int, str, float, float, str | None, str]] = []
+        self.pending: list[dict] = []
+        self.rx = rxmod.ReactionState()
         self.log: list[dict] = []
         self.issues: list[str] = []
         self.counters: dict[str, int] = {}
@@ -165,8 +168,14 @@ class Battle:
         sub_v = row.get("str" if op.sub_attr == "力量" else
                         "agi" if op.sub_attr == "敏捷" else
                         "wisd" if op.sub_attr == "智识" else "will", 0)
+        w_atk = self.sc.weapon_atk
+        if not w_atk:
+            curve = (op.weapon or {}).get("atk_by_level") or []
+            if curve:
+                idx = max(0, min(int(self.sc.weapon_level), len(curve)) - 1)
+                w_atk = float(curve[idx])
         return dmgmod.effective_atk(row.get("atk", 0.0), main_v or 0, sub_v or 0,
-                                    self.sc.weapon_atk)
+                                    w_atk)
 
     def _lv_index(self, sk) -> int:
         return min(len(sk.levels), max(1, self.sc.skill_level)) - 1
@@ -192,11 +201,11 @@ class Battle:
     def advance_to(self, target: int) -> None:
         """推进到 target 帧（不含），按帧序结算命中 / 自动普攻 / 敌人出手。"""
         target = max(target, self.t)
-        self.pending.sort(key=lambda x: x[0])
+        self.pending.sort(key=lambda x: x["frame"])
         guard = 0
         while guard < 20000:
             guard += 1
-            nxt_hit = self.pending[0][0] if self.pending else None
+            nxt_hit = self.pending[0]["frame"] if self.pending else None
             nxt_auto = self._next_auto_frame()
             cands = [f for f in (nxt_hit, nxt_auto)
                      if f is not None and f < target]
@@ -208,8 +217,8 @@ class Battle:
             self._enemy_attacks_between(self.t, frame + 1)
             if nxt_hit is not None and nxt_hit <= frame:
                 item = self.pending.pop(0)
-                self._apply_hit(item[1], item[2], item[3], item[4], item[5],
-                                max(frame, self.t))
+                item["frame"] = max(frame, self.t)
+                self._apply_hit(item)
             else:
                 self._do_auto_attacks(max(frame, self.t))
         self._regen(self.t, target)
@@ -277,12 +286,44 @@ class Battle:
                                  "damage": 0.0})
             self.next_enemy_attack += self.sc.attack_interval_frames
 
-    def _apply_hit(self, cid: str, dmg: float, poise: float,
-                   element: str | None, slot: str, frame: int) -> None:
-        staggered = self.staggered_until > frame
-        if self.sp >= 0 and dmg > 0:
+    def _apply_hit(self, item: dict) -> None:
+        cid = item["cid"]
+        dmg = item["dmg"]
+        poise = item["poise"]
+        element = item["element"]
+        frame = item["frame"]
+        abnormal = item.get("abnormal")
+
+        if dmg > 0:
             self.total_damage += dmg
             self.per_op[cid] = self.per_op.get(cid, 0.0) + dmg
+
+        # ---- 元素 / 物理异常（附加伤害，属于施放者）
+        bonus = 0.0
+        if item.get("applies_element", True) and element in rxmod.ARTS_ELEMENTS:
+            bonus, event = self.rx.apply_element(
+                element, self._atk(cid), frame, self.sc.level)
+        elif item.get("applies_element", True) and abnormal:
+            bonus, event = self.rx.apply_physical(
+                abnormal, self._atk(cid), frame, self.sc.level)
+        else:
+            event = None
+        if bonus:
+            staged = self.staggered_until > frame
+            if staged:
+                bonus *= config.guess("STAGGER_DMG_MULT")
+            bonus = round(bonus)
+            self.total_damage += bonus
+            self.per_op[cid] = self.per_op.get(cid, 0.0) + bonus
+            self.counters["reaction_dmg"] = (
+                self.counters.get("reaction_dmg", 0) + int(bonus))
+        if event:
+            self.log.append({
+                "frame": frame, "kind": "reaction", "op": cid,
+                "label": f"{self.ops[cid].name_zh}·{event}",
+                "damage": round(bonus, 1),
+            })
+
         if poise > 0:
             self.enemy_poise += poise
             if self.enemy_poise >= self.sc.enemy_poise:
@@ -354,7 +395,7 @@ class Battle:
         cands = [self.end]
         cands.append(self.global_busy)
         if self.pending:
-            cands.append(min(p[0] for p in self.pending))
+            cands.append(min(p["frame"] for p in self.pending))
         cands.append(self.next_enemy_attack)
         for v in self.window_until.values():
             if v > self.t:
@@ -433,8 +474,15 @@ class Battle:
                 staggered=self.staggered_until > frame,
                 enemy_def=self.sc.enemy_def, enemy_res=self.sc.enemy_res,
             ))
-            self.pending.append((frame, cid, float(d), poise_share,
-                                 element, sk.slot))
+            self.pending.append({
+                "frame": frame, "cid": cid, "dmg": float(d),
+                "poise": poise_share, "element": element,
+                "slot": sk.slot,
+                "abnormal": (sk.semantics or {}).get("abnormal"),
+                # 附着/爆发/异常由"技能"触发；普攻/重击/冲刺只做伤害
+                "applies_element": sk.slot not in (
+                    "normal_attack", "power_attack", "dash_attack"),
+            })
         self.log.append({
             "frame": start,
             "frame_end": start + max(commit, total),
@@ -507,7 +555,8 @@ class Battle:
         for name in ("energy", "ult_cd_until", "combo_cd_until", "window_until",
                      "busy_until", "stage", "per_op", "auto_next"):
             setattr(b, name, dict(getattr(self, name)))
-        b.pending = list(self.pending)
+        b.pending = [dict(x) for x in self.pending]
+        b.rx = self.rx.clone()
         b.log = list(self.log)
         b.issues = list(self.issues)
         b.counters = dict(self.counters)
@@ -545,5 +594,6 @@ class Battle:
             legality_issues=list(self.issues),
             stats={"cast_counts": dict(self.counters),
                    "sp_left": round(self.sp, 1),
-                   "energy_left": {c: round(v, 1) for c, v in self.energy.items()}},
+                   "energy_left": {c: round(v, 1) for c, v in self.energy.items()},
+                   "reactions": self.rx.to_dict()},
         )

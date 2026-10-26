@@ -162,8 +162,18 @@ class Handler(BaseHTTPRequestHandler):
 
 def ensure_dataset(verbose: bool = True) -> bool:
     """首次运行时自动构建数据集（发行包里不附带游戏原始数据）。"""
-    if (config.NORM / "dataset.json").exists():
-        return True
+    ds_path = config.NORM / "dataset.json"
+    if ds_path.exists():
+        try:
+            import json as _json
+            meta = _json.loads(ds_path.read_text(encoding="utf-8"))
+            if meta.get("schema_version") == config.SCHEMA_VERSION:
+                return True
+            if verbose:
+                print(f"[serve] 数据 schema {meta.get('schema_version')} → "
+                      f"{config.SCHEMA_VERSION}，重建数据集…")
+        except Exception:  # noqa: BLE001
+            pass
     if verbose:
         print("[serve] 首次运行：正在从数据源构建数据集（需要联网，约 1~3 分钟）…")
     from ..data import build as build_mod

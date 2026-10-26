@@ -84,6 +84,7 @@ class Skill:
     levels: list[SkillLevel] = field(default_factory=list)
     semantics: dict[str, Any] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
+    role: str = "damage"          # damage / heal / buff / utility
     # wiki 的"展示口径"总倍率（12 级），用于给伤害总量定锚
     wiki_anchor: dict[str, Any] | None = None
     sources: dict[str, str] = field(default_factory=dict)
@@ -162,6 +163,7 @@ class Operator:
     main_attr: str | None = None
     sub_attr: str | None = None
     default_weapon_id: str | None = None
+    weapon: dict = field(default_factory=dict)
     battle_tags: list[str] = field(default_factory=list)
     stats: list[dict] = field(default_factory=list)   # [{level, str, agi, wisd, will, max_hp, atk, def}]
     skills: dict[str, Skill] = field(default_factory=dict)
@@ -193,6 +195,7 @@ class Operator:
             "main_attr": self.main_attr,
             "sub_attr": self.sub_attr,
             "default_weapon_id": self.default_weapon_id,
+            "weapon": self.weapon,
             "battle_tags": self.battle_tags,
             "stats": self.stats,
             "normal_chain": self.normal_chain,
@@ -228,6 +231,7 @@ class Operator:
                 levels=[SkillLevel(**lv) for lv in (sd.get("levels") or [])],
                 semantics=sd.get("semantics") or {},
                 tags=sd.get("tags") or [],
+                role=sd.get("role", "damage"),
                 wiki_anchor=sd.get("wiki_anchor"),
                 sources=sd.get("sources") or {},
             )
@@ -242,6 +246,7 @@ class Operator:
             main_attr=d.get("main_attr"),
             sub_attr=d.get("sub_attr"),
             default_weapon_id=d.get("default_weapon_id"),
+            weapon=d.get("weapon") or {},
             battle_tags=d.get("battle_tags") or [],
             stats=d.get("stats") or [],
             skills=skills,

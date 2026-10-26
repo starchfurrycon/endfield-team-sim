@@ -205,6 +205,16 @@ def build(force: bool = False, verbose: bool = True) -> dict:
     tags_tbl = src.table("CharBattleTagTable.json")
     battle_const = src.table("BattleConst.json")
     i18n = load_i18n(src)
+    weapons: dict = {}
+    weapon_curves: dict = {}
+    try:
+        weapons = src.table("WeaponBasicTable.json") or {}
+        weapon_curves = src.table("WeaponUpgradeTemplateTable.json") or {}
+        if verbose:
+            print(f"[build] 武器 {len(weapons)} 把 / 成长曲线 {len(weapon_curves)} 条")
+    except Exception as e:  # noqa: BLE001
+        if verbose:
+            print(f"[build] 武器表不可用：{type(e).__name__}")
 
     def t(node) -> str | None:
         direct = _text(node)
@@ -339,12 +349,20 @@ def build(force: bool = False, verbose: bool = True) -> dict:
                     ult_cost=cost_value if cost_type == 0 and slot == "ultimate" else None,
                     energy_gain=bb.get("usp"),
                 ))
+            bb0 = {x["key"]: float(x.get("value") or 0.0)
+                   for x in (rows[0].get("blackboard") or [])}
+            has_dmg = any(v > 0 for k, v in bb0.items()
+                          if k.startswith("atk_scale"))
+            has_heal = any(v > 0 for k, v in bb0.items()
+                           if k.startswith("heal"))
+            role = ("damage" if has_dmg
+                    else "heal" if has_heal else "buff")
             key = skid if slot != "normal_attack" else skid
             skills[key] = Skill(
                 skill_id=skid, slot=slot, stage=stage,
                 element=None,  # 由 wiki 的「战技属性」等字段补齐
                 timing=timing, levels=levels,
-                name_zh=None,
+                name_zh=None, role=role,
                 sources={"multipliers": "SkillPatchTable", "timing": "Json/SkillData"},
             )
             if slot == "normal_attack":
@@ -368,6 +386,15 @@ def build(force: bool = False, verbose: bool = True) -> dict:
                 "labels": "wiki SMW" if wk else "CharacterTable/i18n",
             },
         )
+        w = weapons.get(weapon_id) or {}
+        curve = (weapon_curves.get(w.get("levelTemplateId") or "") or {}).get("list") or []
+        op.weapon = {
+            "id": weapon_id,
+            "rarity": w.get("rarity"),
+            "max_lv": w.get("maxLv"),
+            "atk_by_level": [int(x.get("baseAtk") or 0) for x in curve],
+            "skills": w.get("weaponSkillList") or [],
+        }
         operators[cid] = op
 
     # ---- wiki 文本（逐干员，限速）
@@ -417,6 +444,7 @@ def build(force: bool = False, verbose: bool = True) -> dict:
         cross = {"error": f"{type(e).__name__}: {e}"}
     dataset = {
         "version": version,
+        "schema_version": config.SCHEMA_VERSION,
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "operator_ids": sorted(operators),
         "sources": {
@@ -558,6 +586,7 @@ def _apply_wiki_skill_text(op: Operator, f: dict[str, str]) -> None:
 
 def _dataset_version(head: dict, ops: dict, wiki_meta: dict) -> str:
     h = hashlib.sha256()
+    h.update(f"schema={config.SCHEMA_VERSION}".encode())
     h.update(str(head.get("sha")).encode())
     h.update(str(wiki_meta.get("articles")).encode())
     for cid in sorted(ops):
