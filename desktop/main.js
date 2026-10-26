@@ -1,4 +1,4 @@
-// 终末地配队模拟 · Electron 桌面壳
+// 随心配（SUIXINPEI）· Electron 桌面壳
 // 开发：加载仓库里的 run.py serve；打包：加载随包的 endfield-server.exe
 // 启动状态机：starting → server_up → page_loaded（失败 → failed）
 const { app, BrowserWindow, dialog, shell } = require('electron');
@@ -109,26 +109,21 @@ async function waitForServer(port, timeoutMs = 180000) {
 
 function splashHtml(msg) {
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-  html,body{height:100%;margin:0;background:#060708;color:#e9eef2;
+  html,body{height:100%;margin:0;background:#e8e8e2;color:#101110;
     font-family:Bahnschrift,"Segoe UI","Microsoft YaHei UI",sans-serif;
     display:flex;align-items:center;justify-content:center}
-  .box{width:min(520px,86vw);border:1px solid rgba(158,178,192,.28);padding:26px 28px;
-    position:relative;background:linear-gradient(180deg,#0d1114,#090b0d)}
-  .box:before,.box:after{content:"";position:absolute;width:12px;height:12px;
-    border:1px solid #ffd23f}
-  .box:before{left:-1px;top:-1px;border-right:0;border-bottom:0}
-  .box:after{right:-1px;bottom:-1px;border-left:0;border-top:0}
+  .box{width:min(520px,86vw);border:2px solid #101110;padding:26px 28px;
+    position:relative;background:#f2f2ec;box-shadow:8px 8px 0 #101110}
   .lat{font-family:Consolas,monospace;font-size:10px;letter-spacing:.3em;
-    color:#ffd23f;text-transform:uppercase}
-  h1{font-size:16px;margin:8px 0 16px;font-weight:600}
-  .bar{height:6px;background:rgba(255,255,255,.07);border:1px solid rgba(158,178,192,.2)}
-  .bar i{display:block;height:100%;width:38%;background:
-    repeating-linear-gradient(90deg,#ffd23f 0 8px,rgba(255,210,63,.2) 8px 10px);
+    color:#4a4c48;text-transform:uppercase}
+  h1{font-size:20px;margin:8px 0 18px;font-weight:600}
+  .bar{height:10px;background:#dcddd6;border:1px solid #101110}
+  .bar i{display:block;height:100%;width:38%;background:#fff500;
     animation:run 1.1s linear infinite}
   @keyframes run{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
-  .msg{margin-top:12px;font-family:Consolas,monospace;font-size:11px;color:#8b9aa6}
+  .msg{margin-top:12px;font-family:Consolas,monospace;font-size:11px;color:#4a4c48}
   </style></head><body><div class="box">
-  <div class="lat">Endfield // Squad Simulator</div>
+  <div class="lat">SUIXINPEI // 随心配</div>
   <h1>正在启动本地服务</h1>
   <div class="bar"><i></i></div>
   <div class="msg">${msg.replace(/[<>&]/g, '')}</div>
@@ -141,14 +136,16 @@ function showFailure(detail) {
   const safe = String(detail || '').replace(/[<>&]/g, '');
   win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(
     `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-     body{background:#060708;color:#e9eef2;font-family:Bahnschrift,"Microsoft YaHei UI",sans-serif;
+     body{background:#e8e8e2;color:#101110;font-family:Bahnschrift,"Microsoft YaHei UI",sans-serif;
      padding:44px;line-height:1.7}
-     pre{background:#0d1114;border:1px solid rgba(158,178,192,.25);padding:12px;
-     white-space:pre-wrap;font:11px/1.6 Consolas,monospace;color:#8b9aa6}
-     b{color:#ffd23f;font-family:Consolas,monospace;letter-spacing:.2em;font-size:11px}
-     </style></head><body><b>ENDFIELD // FAILED</b>
+     pre{background:#f2f2ec;border:1px solid #101110;padding:12px;
+     white-space:pre-wrap;font:11px/1.6 Consolas,monospace;color:#4a4c48;
+     box-shadow:4px 4px 0 #101110}
+     b{color:#101110;background:#fff500;font-family:Consolas,monospace;
+     letter-spacing:.2em;font-size:11px;padding:2px 6px;border:1px solid #101110}
+     </style></head><body><b>SUIXINPEI // FAILED</b>
      <h2>后端没有启动成功</h2><pre>${safe}</pre>
-     <p style="color:#8b9aa6;font-size:12px">可尝试：删除 data 目录后重启；或查看 data/logs/server.log</p>
+     <p style="color:#4a4c48;font-size:12px">可尝试：删除 data 目录后重启；或查看 data/logs/server.log</p>
      </body></html>`));
 }
 
@@ -156,12 +153,12 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1500, height: 940,
     minWidth: 1180, minHeight: 720,
-    backgroundColor: '#060708',
-    title: '终末地配队模拟',
+    backgroundColor: '#e8e8e2',
+    title: '随心配',
     icon: fs.existsSync(ICON) ? ICON : undefined,
     show: true,
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#060708', symbolColor: '#c9d4dc', height: 40 },
+    titleBarOverlay: { color: '#e8e8e2', symbolColor: '#101110', height: 40 },
     webPreferences: { contextIsolation: true, nodeIntegration: false,
                       sandbox: true, spellcheck: false },
   });

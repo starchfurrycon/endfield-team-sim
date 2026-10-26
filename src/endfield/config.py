@@ -54,7 +54,7 @@ GITHUB_BRANCH = "main"
 WIKI_API = "https://wiki.biligame.com/zmd/api.php"
 WIKI_BASE = "https://wiki.biligame.com/zmd/"
 
-USER_AGENT = "endfield-team-sim/0.1 (research; contact: local)"
+USER_AGENT = "suixinpei/3.1 (research; contact: local)"
 
 # 只拉这些表（其余按需）
 TABLES = [

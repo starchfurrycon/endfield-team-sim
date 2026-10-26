@@ -1,4 +1,4 @@
-# 架构说明（v3.0.0）
+# 架构说明（v3.1.0）
 
 这份文档描述**软件怎么跑起来、状态怎么流转、代码边界在哪**。
 产品边界（数值能不能当真）在 README / CHANGELOG，这里只讲工程结构。
@@ -142,8 +142,8 @@ starting ──► server_up ──► page_loaded
 ### 打包产物（`tools/package_desktop.py`）
 
 ```
-EndfieldSim-3.0.0-win64/
-├─ EndfieldSim.exe            Electron（rcedit 写图标/版本信息）
+随心配-3.0.0-win64/
+├─ 随心配.exe            Electron（rcedit 写图标/版本信息）
 ├─ resources/app/             main.js / index.html / package.json / assets
 ├─ resources/server/          endfield-server.exe（PyInstaller onefile）
 └─ README.txt / LICENSE.txt

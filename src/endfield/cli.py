@@ -443,7 +443,7 @@ def cmd_loadout(args) -> int:
     return 0
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="endfield", description="终末地配队模拟")
+    ap = argparse.ArgumentParser(prog="endfield", description="随心配")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("sync", help="拉取数据源")

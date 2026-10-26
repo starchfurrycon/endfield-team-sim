@@ -1,7 +1,7 @@
 """组装 Windows 便携版桌面应用（Electron 壳 + 随包 server）。
 
-产物：release/EndfieldSim-3.0.0-win64/
-  EndfieldSim.exe            ← 改名后的 electron.exe（rcedit 写图标/版本信息）
+产物：release/随心配-3.0.0-win64/
+  随心配.exe            ← 改名后的 electron.exe（rcedit 写图标/版本信息）
   resources/app/             ← main.js / index.html / package.json / assets
   resources/server/          ← endfield-server.exe
   README.txt / LICENSE.txt
@@ -17,8 +17,8 @@ ROOT = Path('.').resolve()
 DESKTOP = ROOT / 'desktop'
 ELECTRON = DESKTOP / 'node_modules' / 'electron' / 'dist'
 RCEDIT = DESKTOP / 'node_modules' / 'rcedit' / 'bin' / 'rcedit-x64.exe'
-APP_VERSION = '3.0.0'
-OUT = ROOT / 'release' / f'EndfieldSim-{APP_VERSION}-win64'
+APP_VERSION = '3.1.0'
+OUT = ROOT / 'release' / f'随心配-{APP_VERSION}-win64'
 
 if OUT.exists():
     shutil.rmtree(OUT)
@@ -56,7 +56,7 @@ if locales.exists():
 print('[pkg] locales:', sorted(p.name for p in locales.iterdir()) if locales.exists() else [])
 
 # 5) 改名 + 写图标/版本
-exe = OUT / 'EndfieldSim.exe'
+exe = OUT / '随心配.exe'
 (OUT / 'electron.exe').rename(exe)
 if RCEDIT.exists():
     subprocess.run([
@@ -64,11 +64,11 @@ if RCEDIT.exists():
         '--set-icon', str(DESKTOP / 'assets' / 'icon.ico'),
         '--set-file-version', APP_VERSION,
         '--set-product-version', f'{APP_VERSION}.0',
-        '--set-version-string', 'FileDescription', '终末地配队模拟',
-        '--set-version-string', 'ProductName', '终末地配队模拟',
+        '--set-version-string', 'FileDescription', '随心配',
+        '--set-version-string', 'ProductName', '随心配',
         '--set-version-string', 'CompanyName', 'starchfurrycon',
         '--set-version-string', 'LegalCopyright', 'MIT / 非官方粉丝作品',
-        '--set-version-string', 'OriginalFilename', 'EndfieldSim.exe',
+        '--set-version-string', 'OriginalFilename', '随心配.exe',
     ], check=True)
     print('[pkg] rcedit ok')
 else:
