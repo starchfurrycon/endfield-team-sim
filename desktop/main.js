@@ -153,12 +153,12 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1500, height: 940,
     minWidth: 1180, minHeight: 720,
-    backgroundColor: '#e8e8e2',
+    backgroundColor: '#f4f4f0',
     title: '随心配',
     icon: fs.existsSync(ICON) ? ICON : undefined,
     show: true,
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#e8e8e2', symbolColor: '#101110', height: 40 },
+    titleBarOverlay: { color: '#101110', symbolColor: '#f2f2ec', height: 40 },
     webPreferences: { contextIsolation: true, nodeIntegration: false,
                       sandbox: true, spellcheck: false },
   });
