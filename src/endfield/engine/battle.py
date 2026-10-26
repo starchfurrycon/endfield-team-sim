@@ -51,6 +51,7 @@ class Scenario:
     potential_level: int = 0      # 潜能等级 0~5（默认不点）
     equip_ids: list[str] = field(default_factory=list)   # 4 件装备（默认空）
     equip_level: int = 3          # 精锻等级 0~3
+    weapon_skill_level: int = 9   # 武器技能等级 1~9（被动属性）
     talent_level: int = 3         # 天赋阶段（取数据里可用的最高阶）
 
     def to_dict(self) -> dict:
@@ -182,6 +183,10 @@ class Battle:
                 idx = max(0, min(int(self.sc.weapon_level), len(curve)) - 1)
                 w_atk = float(curve[idx])
         extra = (self.mod.get(cid) or {}).get("attrs") or {}
+        _ma = float(extra.get("__mainattr__", 0.0))
+        if _ma:
+            main_v = (main_v or 0) + _ma
+            sub_v = (sub_v or 0) + _ma if False else sub_v
         for k in ("str", "agi", "wisd", "will"):
             if k in extra:
                 if k == "str":
@@ -196,8 +201,9 @@ class Battle:
                 else:
                     main_v = (main_v or 0) + extra[k] if op.main_attr == "意志" else main_v
                     sub_v = (sub_v or 0) + extra[k] if op.sub_attr == "意志" else sub_v
-        return dmgmod.effective_atk(row.get("atk", 0.0), main_v or 0, sub_v or 0,
+        base = dmgmod.effective_atk(row.get("atk", 0.0), main_v or 0, sub_v or 0,
                                     w_atk)
+        return base * (1.0 + float((self.mod.get(cid) or {}).get("atk_pct", 0.0)))
 
     def _lv_index(self, sk) -> int:
         return min(len(sk.levels), max(1, self.sc.skill_level)) - 1
@@ -497,8 +503,25 @@ class Battle:
             for k in range(1, int(self.sc.potential_level) + 1):
                 take((mods.get("potentials") or {}).get(str(k)), f"P{k}")
 
+            # 武器被动：wpn_attr_*（属性）/ wpn_sp_attr_*（atk% 等）
+            wbb = op.weapon.get("skill_bb") or []
+            if wbb:
+                idx = max(0, min(int(self.sc.weapon_skill_level), len(wbb)) - 1)
+                atk_pct = 0.0
+                for k, v in (wbb[idx] or {}).items():
+                    if k in ("str", "agi", "wisd", "will"):
+                        attrs[k] = attrs.get(k, 0.0) + float(v)
+                        applied.append(f"W:{k}+{v:g}")
+                    elif k == "atk":
+                        atk_pct += float(v)
+                        applied.append(f"W:atk+{float(v):.1%}")
+                    elif k == "mainattr":
+                        attrs["__mainattr__"] = attrs.get("__mainattr__", 0.0) + float(v)
+                        applied.append(f"W:mainattr+{float(v):g}")
+
             out[cid] = {"attrs": attrs, "dmg_bonus": dmg, "ai": ai,
-                        "bb": bb, "applied": applied}
+                        "bb": bb, "atk_pct": atk_pct if wbb else 0.0,
+                        "applied": applied}
         return out
 
 

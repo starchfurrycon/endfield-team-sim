@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.5.0 (2026-10-26)
+
+接入**武器被动技能**（`weaponSkillList` 里的 `wpn_attr_*` / `wpn_sp_attr_*`）。
+
+### 新增
+
+- `build` 解析每把武器 9 级被动黑板（`mainattr` / `str` / `agi` / `wisd` / `will` / `atk`）
+- 引擎按 `Scenario.weapon_skill_level`（默认 9）把它们并入修正通道：
+  - `mainattr` → 主属性（再经 ATK 公式放大）
+  - `atk` → ATK%（乘算）
+  - `str/agi/wisd/will` → 对应属性
+- 条件型武器技能（`sk_wpn_*`，如"攻击力+12% 持续 20 秒"）不施加
+
+示例：陈千语默认武器 `wpn_sword_0003` 的 `wpn_attr_main_low` 在 9 级给主属性 +79
+→ ATK 1021 → 1227。
+
+### 测试
+61 项全绿（装备测试改为只断言 `EQ:` 条目为空，因为武器被动 `W:` 默认生效）。
+
+
 ## v1.4.0 (2026-10-26)
 
 接入**装备**（EquipTable / EquipSuitTable）。

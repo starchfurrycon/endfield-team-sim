@@ -400,7 +400,20 @@ def build(force: bool = False, verbose: bool = True) -> dict:
         )
         w = weapons.get(weapon_id) or {}
         curve = (weapon_curves.get(w.get("levelTemplateId") or "") or {}).get("list") or []
+        wk_bb = [{} for _ in range(9)]
+        for wsid in (w.get("weaponSkillList") or []):
+            if not (wsid.startswith("wpn_attr_") or wsid.startswith("wpn_sp_attr_")):
+                continue
+            wrows = patch_by_id.get(wsid) or {}
+            for row in wrows.get("SkillPatchDataBundle") or []:
+                lv = int(row.get("level") or 1)
+                slot = wk_bb[min(lv, 9) - 1]
+                for x in row.get("blackboard") or []:
+                    v = float(x.get("value") or 0.0)
+                    if v:
+                        slot[x["key"]] = slot.get(x["key"], 0.0) + v
         op.weapon = {
+            "skill_bb": wk_bb,
             "id": weapon_id,
             "rarity": w.get("rarity"),
             "max_lv": w.get("maxLv"),

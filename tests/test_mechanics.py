@@ -258,7 +258,9 @@ class TestEquipment(unittest.TestCase):
     def test_default_has_no_equipment(self):
         cid = self.op.char_id
         b = Battle(self.ds, Scenario(team=[cid]))
-        self.assertEqual(b.mod[cid]["applied"], [])
+        # 默认不穿装备：不应出现 EQ: 前缀的条目（武器被动 W: 是另一回事）
+        eq = [a for a in b.mod[cid]["applied"] if str(a).startswith("EQ:")]
+        self.assertEqual(eq, [])
 
 
 if __name__ == "__main__":
