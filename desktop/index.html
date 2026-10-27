@@ -125,7 +125,7 @@ button:disabled{opacity:.4;cursor:default}
 .lane{display:grid;grid-template-columns:44px minmax(0,1fr);gap:10px;align-items:center;
   margin:3px 0}
 .lane .lb{display:flex;gap:5px;align-items:center;overflow:hidden}
-.lane .lb span{display:none}
+
 .track{position:relative;height:20px;background:var(--sunk);border-radius:3px}
 .track::after{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
   border-radius:3px;
@@ -353,6 +353,21 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
 .llm-checks .chk.ok{color:#2f9e44}
 .llm-checks .chk.bad{color:var(--red)}
 .llm-checks .chk.skip{color:var(--muted2)}
+
+/* 横向滚动轴：长轴/循环轴 */
+.axis-scroll{overflow-x:auto;overflow-y:hidden;padding-bottom:6px;
+  scrollbar-width:thin}
+.axis-inner{position:relative;min-width:100%}
+.axis-inner .lane .lb,
+.axis-inner .wl-row .lb,
+.axis-inner .ticks > div:first-child,
+.axis-inner .wl-head > span:first-child{position:sticky;left:0;z-index:6;
+  background:var(--card);padding-right:6px}
+.axis-inner .lane .lb{background:var(--card)}
+.axis-inner .track{overflow:hidden}
+.axis-scroll::-webkit-scrollbar{height:10px}
+.axis-scroll::-webkit-scrollbar-track{background:var(--sunk)}
+.axis-scroll::-webkit-scrollbar-thumb{background:var(--line2);border:2px solid var(--sunk)}
 </style>
 </head>
 <body>
@@ -743,15 +758,6 @@ async function loadAxis(t, mode, card){
 function gantt(res, order, nameMap){
   const dur = Math.max(1, res.duration_frames)/30;
   const box = el('div');
-  const legend = el('div','legend');
-  [['power_attack','重击'],['battle_skill','战技'],
-   ['combo_skill','连携'],['ultimate','大招'],['enemy','敌人']].forEach(([k, tx]) => {
-    const item = el('span','lg-item');
-    item.appendChild(el('span','lg-sw ' + k));
-    item.appendChild(el('span','lg-tx', tx));
-    legend.appendChild(item);
-  });
-  box.appendChild(legend);
   const lane = (labelNode, events) => {
     const l = el('div','lane');
     const lb = el('div','lb');
@@ -781,9 +787,7 @@ function gantt(res, order, nameMap){
   };
   order.forEach(cid => {
     const op = META.operators.find(o => o.id === cid);
-    const lb = document.createElement('span');
-    lb.appendChild(avatar(op || cid, 18, nameMap[cid]));
-    lb.appendChild(document.createTextNode(nameMap[cid] || cid));
+    const lb = avatar(op || cid, 18, nameMap[cid]);
     const evs = (res.timeline||[]).filter(e => e.kind==='cast' && e.op===cid)
       .map(e => ({...e, bar: e.slot}));
     box.appendChild(lane(lb, evs));
@@ -927,10 +931,26 @@ function waterlines(res, order, nameMap){
 function renderAxis(res, t, cfg, guide){
   const wrap = el('div');
   const order = t.team, nameMap = t.name_map || {};
+  const legend = el('div','legend');
+  [['power_attack','重击'],['battle_skill','战技'],
+   ['combo_skill','连携'],['ultimate','大招'],['enemy','敌人']].forEach(([k, tx]) => {
+    const item = el('span','lg-item');
+    item.appendChild(el('span','lg-sw ' + k));
+    item.appendChild(el('span','lg-tx', tx));
+    legend.appendChild(item);
+  });
+  wrap.appendChild(legend);
+
   const g = gantt(res, order, nameMap);
-  wrap.appendChild(g.box);
-  wrap.appendChild(g.ticks);
-  wrap.appendChild(waterlines(res, order, nameMap));
+  const scroll = el('div','axis-scroll');
+  const inner = el('div','axis-inner');
+  const durS = Math.max(1, res.duration_frames) / 30;
+  inner.style.width = Math.max(320, Math.round(durS * 22)) + 'px';
+  inner.appendChild(g.box);
+  inner.appendChild(g.ticks);
+  inner.appendChild(waterlines(res, order, nameMap));
+  scroll.appendChild(inner);
+  wrap.appendChild(scroll);
 
   // 贡献条（颜色 = 角色，宽度 = 占比；不写字）
   const bar = el('div','contrib');
