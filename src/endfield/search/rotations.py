@@ -105,6 +105,11 @@ def _candidates(b: Battle, limit: int) -> list[Action]:
         atk = [a for a in acts if a.kind == "attack"]
         if atk:
             out.append(atk[0])
+    # 换人是"让另一个主控打重击"的唯一入口，候选里至少留一个
+    if not any(a.kind == "switch" for a in out):
+        sw = [a for a in acts if a.kind == "switch"]
+        if sw:
+            out.append(sw[0])
     return out
 
 
@@ -206,7 +211,7 @@ def axis_from_result(res: Result, ds: Dataset | None = None) -> list[dict]:
     """把 timeline 整理成"轴"：按时间排序的动作表（秒）。"""
     rows = []
     for ev in res.timeline:
-        if ev.get("kind") not in ("cast", "enemy_attack", "stagger"):
+        if ev.get("kind") not in ("cast", "switch", "enemy_attack", "stagger"):
             continue
         rows.append({
             "t": round(ev["frame"] / config.FPS, 2),

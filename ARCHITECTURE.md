@@ -176,5 +176,5 @@ starting ──► server_up ──► page_loaded
 
 - 输入：`Result.timeline` + `stats.energy_cap` + 技能语义（trigger / duration）
 - 输出：`steps`（时间、角色、战技/连携/终结技、触发条件、×N）与 `tips`（最多 3 条）
-- 约束：只讲轴上真实发生的事；切人未建模，只提醒"承诺帧内别切走"
+- 约束：只讲轴上真实发生的事；换人已建模（有开销），重击只属于主控
 - 入口：`/api/axis` 的 `guide` 字段，界面在轴下方渲染步骤带

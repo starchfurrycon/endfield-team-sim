@@ -58,6 +58,20 @@ def build(ds: Dataset, sc: Scenario, res: Result) -> dict:
              for cid in sc.team if cid in ds.operators}
     casts: list[dict] = []
     for ev in res.timeline:
+        if ev.get("kind") == "switch":
+            cid = ev.get("op") or ""
+            casts.append({
+                "cid": cid,
+                "name": names.get(cid, cid),
+                "slot": "switch",
+                "label": "换人",
+                "t": round(ev["frame"] / 30.0, 2),
+                "t_end": round(ev["frame"] / 30.0, 2),
+                "note": "",
+                "count": 1,
+                "skill": "",
+            })
+            continue
         if ev.get("kind") != "cast":
             continue
         slot = ev.get("slot") or ""
@@ -87,6 +101,7 @@ def build(ds: Dataset, sc: Scenario, res: Result) -> dict:
             "skill": (sk.name_zh if sk else ""),
         })
 
+    casts.sort(key=lambda c: c["t"])
     steps = _merge(casts)[:MAX_STEPS]
 
     # 连携触发条件（去重后按人分组）
@@ -118,5 +133,5 @@ def build(ds: Dataset, sc: Scenario, res: Result) -> dict:
         "steps": steps,
         "tips": tips[:3],
         "casts": (res.stats or {}).get("cast_counts") or {},
-        "note": "技能承诺帧内别切人。",
+        "note": "普攻与重击只属于主控；换人后由新主控接着打。",
     }

@@ -48,8 +48,8 @@ class Scenario:
     weapon_level: int = 90          # 默认武器等级（满级）
     main: str | None = None
     seed: int = 0
-    # 主控以外的干员会自动普攻（游戏内教学页 wiki_tut_bat_team_1）
-    offfield_auto_attack: bool = True
+    # 只有主控（controlled）能普攻/重击；研究结论见 docs/MECHANICS.md
+    offfield_auto_attack: bool = False
     potential_level: int = 0      # 潜能等级 0~5（默认不点）
     equip_ids: list[str] = field(default_factory=list)   # 4 件装备（全队同一套，默认空）
     equip_level: int = 3          # 精锻等级 0~3
@@ -81,7 +81,7 @@ class Action:
             if o and o.name_zh:
                 name = o.name_zh
         zh = {"attack": "普攻", "skill": "战技", "combo": "连携技",
-              "ultimate": "终结技"}.get(self.kind, self.kind)
+              "ultimate": "终结技", "switch": "换人"}.get(self.kind, self.kind)
         return f"{name}·{zh}"
 
 
@@ -138,7 +138,6 @@ class Battle:
         # 全局动作锁：同一时刻只有一个角色在场上行动（游戏机制）
         self.global_busy: int = 0
         # 非主控干员的自动普攻排程
-        self.auto_next: dict[str, int] = {c: 18 for c in self.ids}
         self.stage: dict[str, int] = {c: 0 for c in self.ids}
         self.main: str = sc.main or self.ids[0]
         self.enemy_poise: float = sc.enemy_poise
@@ -285,8 +284,7 @@ class Battle:
         while guard < 20000:
             guard += 1
             nxt_hit = self.pending[0]["frame"] if self.pending else None
-            nxt_auto = self._next_auto_frame()
-            cands = [f for f in (nxt_hit, nxt_auto)
+            cands = [f for f in (nxt_hit,)
                      if f is not None and f < target]
             if not cands:
                 break
@@ -302,54 +300,11 @@ class Battle:
                 item = self.pending.pop(0)
                 item["frame"] = max(frame, self.t)
                 self._apply_hit(item)
-            else:
-                self._do_auto_attacks(max(frame, self.t))
         self._regen(self.t, target)
         self._enemy_attacks_between(self.t, target)
         self.t = max(self.t, target)
 
     # ------------------------------------------------------------ 主控外自动普攻
-
-    def _next_auto_frame(self) -> int | None:
-        if not self.sc.offfield_auto_attack:
-            return None
-        best = None
-        for cid, f in self.auto_next.items():
-            if cid == self.main:
-                continue
-            if best is None or f < best:
-                best = f
-        return best
-
-    def _do_auto_attacks(self, frame: int) -> None:
-        """非主控干员自动普攻（游戏内教学页 wiki_tut_bat_team_1）。"""
-        frame = max(frame, self.t)
-        for cid in list(self.ids):
-            if cid == self.main:
-                continue
-            if self.auto_next.get(cid, 10**9) > frame:
-                continue
-            if self.busy_until[cid] > frame:
-                # 在放技能，等它结束再继续自动攻击
-                self.auto_next[cid] = self.busy_until[cid]
-                continue
-            op = self.ops[cid]
-            chain = op.normal_chain
-            idx = self.stage.get(cid, 0)
-            if chain and idx < len(chain):
-                sk = op.skills.get(chain[idx])
-                self.stage[cid] = idx + 1
-            else:
-                sk = self._skill(cid, "power_attack")
-                self.stage[cid] = 0
-            if sk is None:
-                self.auto_next[cid] = frame + 60
-                continue
-            commit = min(sk.timing.commit_frames or 30, MAX_COMMIT_FRAMES)
-            self._schedule_hits(cid, sk, frame, kind="auto")
-            self.auto_next[cid] = frame + max(1, commit) + int(
-                config.guess("AUTO_ATTACK_GAP_FRAMES"))
-            self.counters["auto_attack"] = self.counters.get("auto_attack", 0) + 1
 
     def _regen(self, a: int, b: int) -> None:
         if b <= a:
@@ -769,8 +724,12 @@ class Battle:
             return acts if not include_wait else [Action("wait")]
         # 普攻：任何空闲角色都能打（非主控会先付切人开销，见 apply）
         for cid in self.ids:
-            if self.busy_until[cid] <= self.t:
+            if self.busy_until[cid] > self.t:
+                continue
+            if cid == self.main:
                 acts.append(Action("attack", cid))
+            else:
+                acts.append(Action("switch", cid))
         for cid in self.ids:
             if self.busy_until[cid] > self.t:
                 continue
@@ -802,18 +761,23 @@ class Battle:
             return
         cid = action.op
         assert cid is not None
-        if cid != self.main:
-            # 切人开销（任何动作都一样）
-            self.advance_to(self.t + int(config.guess("SWITCH_FRAMES")))
-            self.main = cid
+        if action.kind == "switch":
+            self._do_switch(cid)
+            return
         if action.kind == "attack":
+            if cid != self.main:
+                self.issues.append(f"{cid} 非主控不能普攻")
+                return
             self._do_attack(cid)
-        elif action.kind == "skill":
-            self._do_cast(cid, "battle_skill")
+        elif action.kind in ("skill", "ultimate"):
+            # 战技/终结技由当前主控释放：非主控要先换人（付切人开销）
+            if cid != self.main:
+                self._switch_to(cid)
+            self._do_cast(cid, "battle_skill" if action.kind == "skill"
+                          else "ultimate")
         elif action.kind == "combo":
+            # 连携是队友的"插入"动作，不改变主控
             self._do_cast(cid, "combo_skill")
-        elif action.kind == "ultimate":
-            self._do_cast(cid, "ultimate")
         else:
             raise ValueError(action.kind)
 
@@ -831,6 +795,24 @@ class Battle:
                 cands.append(v)
         nxt = min((c for c in cands if c > self.t), default=self.end)
         return min(nxt, self.end)
+
+    def _switch_to(self, cid: str) -> None:
+        """切主控（显式换人与"非主控放战技/终结技"共用），付切人开销。"""
+        if cid == self.main:
+            return
+        cost = int(config.guess("SWITCH_FRAMES"))
+        self.advance_to(self.t + cost)
+        self.main = cid
+        self.counters["switch"] = self.counters.get("switch", 0) + 1
+        name = (self.ops[cid].name_zh or cid) if cid in self.ops else cid
+        self.log.append({
+            "frame": self.t, "commit_end": self.t, "kind": "switch",
+            "op": cid, "slot": "switch", "label": f"{name}·换人", "damage": 0.0,
+        })
+
+    def _do_switch(self, cid: str) -> None:
+        """只换主控，不攻击；重击从此由新主控打。"""
+        self._switch_to(cid)
 
     def _do_attack(self, cid: str) -> None:
         op = self.ops[cid]
@@ -976,7 +958,7 @@ class Battle:
         b = Battle.__new__(Battle)
         b.__dict__.update(self.__dict__)
         for name in ("energy", "ult_cd_until", "combo_cd_until", "window_until",
-                     "busy_until", "stage", "per_op", "auto_next"):
+                     "busy_until", "stage", "per_op"):
             setattr(b, name, dict(getattr(self, name)))
         b.pending = [dict(x) for x in self.pending]
         b.rx = self.rx.clone()
@@ -1006,6 +988,7 @@ class Battle:
             "敌人受击硬直与真实 AI 节奏（固定间隔出手）",
             "连携技的额外条件（如层数、消耗）",
             "多段技能的分支判定（if/else 无法区分）",
+            "处决攻击 / 闪避回技力 / 真实切人动画帧（切人开销为估计值）",
         ]
         warnings.append("技力恢复速度、切人开销等为 estimate，可在 config.py 校准")
         # 水位采样：补上结束点，保证 UI 的曲线覆盖整个窗口

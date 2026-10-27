@@ -1,7 +1,7 @@
 {
   "name": "suixinpei",
   "productName": "随心配",
-  "version": "3.8.0",
+  "version": "3.9.0",
   "private": true,
   "description": "随心配 · 终末地方案模拟桌面壳",
   "main": "main.js",

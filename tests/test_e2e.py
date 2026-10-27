@@ -62,8 +62,8 @@ class TestConstraints(unittest.TestCase):
         self.assertIn("不存在的干员", res["missing_names"])
 
 
-class TestAutoAttack(unittest.TestCase):
-    """主控以外的干员会自动普攻（wiki_tut_bat_team_1）。"""
+class TestMainControl(unittest.TestCase):
+    """只有主控能普攻/重击；换人是显式动作（docs/MECHANICS.md）。"""
 
     @classmethod
     def setUpClass(cls):
@@ -71,30 +71,65 @@ class TestAutoAttack(unittest.TestCase):
         cls.ids = ["chr_0005_chen", "chr_0021_whiten", "chr_0022_bounda",
                    "chr_0028_wulfa"]
 
-    def _run(self, auto: bool) -> object:
+    def _battle(self):
         from endfield.engine.battle import Battle
-        b = Battle(self.ds, Scenario(team=self.ids, duration_s=20,
-                                     offfield_auto_attack=auto))
+        return Battle(self.ds, Scenario(team=self.ids, duration_s=20))
+
+    def test_no_offfield_auto_attack(self):
+        b = self._battle()
         b.advance_to(b.end)          # 主控什么都不做
-        return b.result()
-
-    def test_offfield_deals_damage(self):
-        res = self._run(True)
-        self.assertGreater(res.total_damage, 0)
-        self.assertGreater(res.stats["cast_counts"].get("auto_attack", 0), 0)
-
-    def test_disabled_means_no_damage(self):
-        res = self._run(False)
+        res = b.result()
         self.assertEqual(res.total_damage, 0)
+        self.assertEqual(res.stats["cast_counts"].get("auto_attack", 0), 0)
 
-    def test_offfield_heavy_gives_no_sp(self):
-        """只有主控的重击回技力，自动普攻不应该额外给技力。"""
-        from endfield.engine.battle import Battle
-        b = Battle(self.ds, Scenario(team=self.ids, duration_s=20))
-        start = b.sp
-        b.advance_to(b.end)
-        regen_cap = start + 20 * config.guess("SP_REGEN_PER_SEC")
-        self.assertLessEqual(b.sp, regen_cap + 1e-6)
+    def test_attacks_only_for_main(self):
+        b = self._battle()
+        acts = b.legal_actions(include_wait=False)
+        attacks = [a for a in acts if a.kind == "attack"]
+        self.assertTrue(attacks)
+        self.assertTrue(all(a.op == b.main for a in attacks))
+        self.assertTrue(any(a.kind == "switch" for a in acts))
+
+    def test_switch_changes_main(self):
+        from endfield.engine.battle import Action
+        b = self._battle()
+        old = b.main
+        other = next(cid for cid in self.ids if cid != old)
+        t0 = b.t
+        b.apply(Action("switch", other))
+        self.assertEqual(b.main, other)
+        self.assertGreater(b.t, t0)
+        self.assertGreaterEqual(
+            (b.result().stats.get("cast_counts") or {}).get("switch", 0), 1)
+
+    def test_new_main_can_heavy(self):
+        from endfield.engine.battle import Action
+        b = self._battle()
+        old = b.main
+        other = next(cid for cid in self.ids if cid != old)
+        b.apply(Action("switch", other))
+        for _ in range(8):
+            if b.t >= b.end:
+                break
+            b.apply(Action("attack", other))
+        res = b.result()
+        heavy = [ev for ev in res.timeline if ev.get("slot") == "power_attack"]
+        self.assertTrue(heavy)
+        self.assertTrue(all(ev.get("op") == other for ev in heavy))
+
+    def test_heavy_gives_sp(self):
+        from endfield.engine.battle import Action
+        b = self._battle()
+        for _ in range(8):
+            if b.t >= b.end:
+                break
+            before = b.sp
+            b.apply(Action("attack", b.main))
+            heavy = [ev for ev in b.log if ev.get("slot") == "power_attack"]
+            if heavy:
+                self.assertGreater(b.sp, before - 1e-6)
+                return
+        self.fail("main never reached a heavy attack")
 
 
 class TestMonotonicity(unittest.TestCase):

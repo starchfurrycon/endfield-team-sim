@@ -33,7 +33,7 @@ class TestGuide(unittest.TestCase):
         self.assertTrue(steps)
         self.assertLessEqual(len(steps), guide.MAX_STEPS)
         for s in steps:
-            self.assertIn(s["label"], ("战技", "连携", "终结技"))
+            self.assertIn(s["label"], ("战技", "连携", "终结技", "换人"))
             self.assertIn("t", s)
             self.assertGreaterEqual(s["t"], 0.0)
         times = [s["t"] for s in steps]
@@ -58,7 +58,7 @@ class TestGuide(unittest.TestCase):
         self.assertIn("大招", text)
 
     def test_note_mentions_commit_frames(self):
-        self.assertIn("承诺帧", self.g["note"])
+        self.assertIn("主控", self.g["note"])
 
     def test_axis_api_returns_guide(self):
         from endfield.web import api

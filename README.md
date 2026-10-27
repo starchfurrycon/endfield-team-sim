@@ -1,4 +1,4 @@
-# 随心配（Suixinpei）· v3.8.0
+# 随心配（Suixinpei）· v3.9.0
 
 《明日方舟：终末地》的**自动配队 + 输出轴**桌面工具。
 
@@ -26,7 +26,7 @@
 
 ### 方式 A：下载桌面版（推荐）
 
-从 Releases 下载 `suixinpei-3.8.0-win64.zip`，解压后双击：
+从 Releases 下载 `suixinpei-3.9.0-win64.zip`，解压后双击：
 
 ```
 随心配.exe
@@ -144,7 +144,7 @@ BWIKI 语义   ──┘                    └─ 中文描述/天赋/潜能
 
 - 重击回技力 **100 点（1 段）** ← `buff_dung_atb_add_lastnormalattack` `atb=1.0`
 - 战技给**全队** +6.5 终结技能量 ← `buff_common_obtain_ultimate_sp` `usp_everyone=6.5`
-- 连携技**不消耗技力**、战技**无冷却**、**主控以外自动普攻** ← 游戏内教学页
+- 连携技**不消耗技力**、战技**无冷却**；**只有主控能普攻/重击**，换人可切主控 ← 见 [docs/MECHANICS.md](docs/MECHANICS.md)
 
 ---
 
