@@ -1,6 +1,6 @@
 # 记忆文件 · 随心配（Suixinpei）
 
-> 最后更新：2026-10-26 · 版本 **v3.13.1**
+> 最后更新：2026-10-26 · 版本 **v3.14.1**
 > 这份文件用来交接：项目是什么、代码在哪、怎么跑、边界在哪、下一步可以做什么。
 
 ## 1. 身份
@@ -8,12 +8,12 @@
 - 软件名 / 仓库：**随心配** / `starchfurrycon/suixinpei`
 - 定位：《明日方舟：终末地》的**配队 + 输出轴**桌面工具
 - 技术栈：Python 3.10+（仅标准库） + 单页 HTML/JS + Electron 便携壳
-- 最新发行：https://github.com/starchfurrycon/suixinpei/releases/tag/v3.13.1
+- 最新发行：https://github.com/starchfurrycon/suixinpei/releases/tag/v3.14.1
 
 | 产物 | 大小 | SHA256 |
 |---|---|---|
-| `suixinpei-3.13.1-win64.zip` | 114,506,087 | `B5E006272DF51D3B82D2156E814B08A4FD28B4F2904F4D3496E7EB27554FC166` |
-| `suixinpei-server-3.13.1-win64.zip` | 9,315,937 | `6D8759BB596B36C307FCB3BF51FC42BAF75633AEBB7AE762C7742AC789DF06E5` |
+| `suixinpei-3.14.1-win64.zip` | 114,515,466 | `E0414FA2AEE9110897744EB92C5260D45348995B05108D162ADFA4E810316046` |
+| `suixinpei-server-3.14.1-win64.zip` | 9,325,176 | `77491F4D71B36B116D6C53DAF3E9DFA7C9090D58C301C32F3868FD6854E12557` |
 
 ## 2. 边界（先读这条）
 
@@ -85,6 +85,7 @@ python tools/package_desktop.py                # 需要 electron + rcedit
 
 ## 7. 近期版本
 
+- v3.14.1 装备/武器推荐重写（专武优先 + 整套 + 一队一个主 C）
 - v3.13.1 演示静音（无配音/无配乐，仅短字幕）
 - v3.13.0 短字幕演示 + BYO API 说明
 - v3.12.0 默认约束版本隔离 + Top3 多样化 + 真实录屏演示
