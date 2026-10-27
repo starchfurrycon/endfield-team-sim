@@ -52,3 +52,13 @@ python run.py llm --apply --mode gaps --limit 5   # 小样本复核，看报告
 
 界面里：`LLM` → 填接口/模型/Key → `测试连接` → `自检` → `运行复核`。
 复核完成后会自动刷新数据并重算当前队伍。
+
+## 5. 自检当场抓到的问题（已修）
+
+v3.7.0 第一次跑打包版自检时，三项提示词检查全是 `0 B`：
+PyInstaller 只打了 `desktop/index.html`，没把 `semantics/prompts/*.md` 打进 exe，
+桌面版的 LLM 通道会直接失效。已在构建命令里加
+`--add-data "src/endfield/semantics/prompts;endfield/semantics/prompts"`，
+打包版自检现在 8 项全 PASS。
+
+这正是"确认能力"的意义：不是看代码写了什么，而是跑一遍真实链路。
