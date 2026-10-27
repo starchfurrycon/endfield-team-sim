@@ -1,6 +1,6 @@
 # 记忆文件 · 随心配（Suixinpei）
 
-> 最后更新：2026-10-26 · 版本 **v3.8.0**
+> 最后更新：2026-10-26 · 版本 **v3.10.0**
 > 这份文件用来交接：项目是什么、代码在哪、怎么跑、边界在哪、下一步可以做什么。
 
 ## 1. 身份
@@ -8,12 +8,12 @@
 - 软件名 / 仓库：**随心配** / `starchfurrycon/suixinpei`
 - 定位：《明日方舟：终末地》的**配队 + 输出轴**桌面工具
 - 技术栈：Python 3.10+（仅标准库） + 单页 HTML/JS + Electron 便携壳
-- 最新发行：https://github.com/starchfurrycon/suixinpei/releases/tag/v3.8.0
+- 最新发行：https://github.com/starchfurrycon/suixinpei/releases/tag/v3.10.0
 
 | 产物 | 大小 | SHA256 |
 |---|---|---|
-| `suixinpei-3.8.0-win64.zip` | 114,493,946 | `946F4858610C44A7028399AD1505B2EA3E04A74516F465CD6FE99922646FC70F` |
-| `suixinpei-server-3.8.0-win64.zip` | 9,315,944 | `9B57CB2B58E63F640EEC4D20CE08E0418F858C7A1FD9D65982AA372D9CE30289` |
+| `suixinpei-3.10.0-win64.zip` | 114,504,336 | `F7625ADEB114497129B44CE090955AA46AAF80DF064355488DD49B835412AFCE` |
+| `suixinpei-server-3.10.0-win64.zip` | 9,314,776 | `0181CF563A1DCF220EB4B4B538C7E45E8A6B161C44F52432D4F78690D50F473A` |
 
 ## 2. 边界（先读这条）
 
@@ -85,6 +85,8 @@ python tools/package_desktop.py                # 需要 electron + rcedit
 
 ## 7. 近期版本
 
+- v3.10.0 推荐配队（0 约束推荐 Top N；必选/排除约束条；同名去重）
+- v3.9.0 主控机制修正（只有主控普攻/重击；换人显式；docs/MECHANICS.md）
 - v3.8.0 横向滚动轴（22px/秒，左侧 sticky）+ 修复甘特行头像被隐藏
 - v3.7.0 轴标注 战/连/终 + LLM 自检 + 打包 prompts 修复
 - v3.6.0 文案补字/收字
@@ -116,6 +118,7 @@ Electron 开发：`cd desktop && npm install && npm start`。
 
 ## 9. 后续可做
 
-- 切人/主控收益建模（现在只提醒"承诺帧内别切"）；
+- 机制待确认项见 `docs/MECHANICS.md`（战技/终结技是否必须主控、连携是否占主控时间、处决/闪避）；
+- 推荐支持"可选池/已拥有"模式（现在必选/排除已够用）；
 - 更多机制：buff/debuff 叠加、武器条件型技能；
 - 轴循环：把"循环轴"从展示（滚动）推进到真正的循环稳定性评分。
