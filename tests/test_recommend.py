@@ -33,6 +33,14 @@ class TestRecommend(unittest.TestCase):
             self.assertEqual(len(names), len(set(names)))
             self.assertEqual(len(names), 4)
 
+    def test_top_teams_are_diverse(self):
+        r = recommend(self.ds, TeamQuery(top_k=3, evaluate=16, duration_s=20),
+                      verbose=False)
+        teams = [set(t["team"]) for t in r["top"]]
+        for i in range(len(teams)):
+            for j in range(i):
+                self.assertLessEqual(len(teams[i] & teams[j]), 2)
+
     def test_must_and_ban(self):
         r = recommend(self.ds, TeamQuery(must=["洛茜"], ban=["狼卫"],
                                          top_k=3, evaluate=6, duration_s=20),

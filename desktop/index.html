@@ -650,10 +650,12 @@ function scheduleRun(delay){
   RUN_TIMER = setTimeout(runTeam, delay == null ? 260 : delay);
 }
 
+const PREFS = 'sx3';
+
 function savePrefs(){
   try{
-    localStorage.setItem('sx.state', JSON.stringify(STATE));
-    localStorage.setItem('sx.params', JSON.stringify({
+    localStorage.setItem(PREFS + '.state', JSON.stringify(STATE));
+    localStorage.setItem(PREFS + '.params', JSON.stringify({
       dur: $('#dur').value, top: $('#top').value, enemy: $('#eprofile').value}));
   }catch(e){}
 }
@@ -688,7 +690,7 @@ async function runTeam(){
   $('#result').classList.add('busy');
   try{
     const data = await jpost('/api/team', {must, ban: picked(2),
-      duration: +$('#dur').value, top: +$('#top').value, evaluate: 8});
+      duration: +$('#dur').value, top: +$('#top').value, evaluate: 24});
     if(token !== RUN_TOKEN) return;
     renderTeams(data);
   }catch(e){
@@ -1443,9 +1445,12 @@ function applyQuery(){
 
 function restorePrefs(){
   try{
-    const st = JSON.parse(localStorage.getItem('sx.state') || '{}');
+    // 旧键（sx.state）不再读取：避免历史演示/测试的必选排除被当成默认
+    localStorage.removeItem('sx.state');
+    localStorage.removeItem('sx.params');
+    const st = JSON.parse(localStorage.getItem(PREFS + '.state') || '{}');
     Object.keys(st).forEach(k => { if(META.operators.some(o => o.id === k)) STATE[k] = st[k]; });
-    const pr = JSON.parse(localStorage.getItem('sx.params') || '{}');
+    const pr = JSON.parse(localStorage.getItem(PREFS + '.params') || '{}');
     if(pr.dur) $('#dur').value = pr.dur;
     if(pr.top) $('#top').value = pr.top;
     if(pr.enemy) $('#eprofile').value = pr.enemy;

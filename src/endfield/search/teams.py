@@ -137,8 +137,13 @@ def candidate_teams(ds: Dataset, q: TeamQuery, level: int = 90,
     seen_ids = {m.char_id for m in must_ops}
     rest = [o for o in rest if o.char_id not in seen_ids and o.char_id not in {
         c for c in _resolve_all(ds, q.ban)}]
-    shortlist = rest[:max(need, min(len(rest), q.evaluate + 4))]
+    shortlist = rest[:max(need, min(len(rest), q.evaluate + 12))]
     combos = list(itertools.combinations(shortlist, need))
+    # 均匀抽样，而不是只取前 N 个组合（否则 Top N 几乎同一核心）
+    if len(combos) > q.evaluate and q.evaluate > 0:
+        step = len(combos) / q.evaluate
+        combos = [combos[min(len(combos) - 1, int(i * step))]
+                  for i in range(q.evaluate)]
     teams = [must_ops + list(c) for c in combos]
     return teams, missing
 
@@ -196,9 +201,25 @@ def recommend(ds: Dataset, q: TeamQuery, level: int = 90,
         if r:
             results.append(r)
     results.sort(key=lambda r: r.score, reverse=True)
+    # 多样性：与已选队伍最多重叠 2 人，避免 Top3 只是"同核心换一个人"
+    picked: list[TeamResult] = []
+    for r in results:
+        if len(picked) >= q.top_k:
+            break
+        overlap = max((len(set(r.team) & set(o.team)) for o in picked), default=0)
+        if picked and overlap >= 3:
+            continue
+        picked.append(r)
+    if len(picked) < q.top_k:
+        chosen = {id(x) for x in picked}
+        for r in results:
+            if id(r) not in chosen:
+                picked.append(r)
+            if len(picked) >= q.top_k:
+                break
     return {
         "query": q.to_dict(),
         "missing_names": missing,
-        "top": [r.__dict__ for r in results[:q.top_k]],
+        "top": [r.__dict__ for r in picked[:q.top_k]],
         "evaluated": len(results),
     }
