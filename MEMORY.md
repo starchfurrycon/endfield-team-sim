@@ -1,6 +1,6 @@
 # 记忆文件 · 随心配（Suixinpei）
 
-> 最后更新：2026-10-26 · 版本 **v3.10.0**
+> 最后更新：2026-10-26 · 版本 **v3.10.1**
 > 这份文件用来交接：项目是什么、代码在哪、怎么跑、边界在哪、下一步可以做什么。
 
 ## 1. 身份
@@ -8,12 +8,12 @@
 - 软件名 / 仓库：**随心配** / `starchfurrycon/suixinpei`
 - 定位：《明日方舟：终末地》的**配队 + 输出轴**桌面工具
 - 技术栈：Python 3.10+（仅标准库） + 单页 HTML/JS + Electron 便携壳
-- 最新发行：https://github.com/starchfurrycon/suixinpei/releases/tag/v3.10.0
+- 最新发行：https://github.com/starchfurrycon/suixinpei/releases/tag/v3.10.1
 
 | 产物 | 大小 | SHA256 |
 |---|---|---|
-| `suixinpei-3.10.0-win64.zip` | 114,504,336 | `F7625ADEB114497129B44CE090955AA46AAF80DF064355488DD49B835412AFCE` |
-| `suixinpei-server-3.10.0-win64.zip` | 9,314,776 | `0181CF563A1DCF220EB4B4B538C7E45E8A6B161C44F52432D4F78690D50F473A` |
+| `suixinpei-3.10.1-win64.zip` | 114,503,135 | `0903C6924C6ECC9BB973CDE4862155C6F1C8B1BE5D42EF10856D9EA1C8760D01` |
+| `suixinpei-server-3.10.1-win64.zip` | 9,314,064 | `23E64B004BF772AC2BD72DB98DE1706CF20630BCEB2B287C43CFD03AAFD81873` |
 
 ## 2. 边界（先读这条）
 
@@ -85,6 +85,7 @@ python tools/package_desktop.py                # 需要 electron + rcedit
 
 ## 7. 近期版本
 
+- v3.10.1 清掉界面说明文字（示例/勾选说明/报告路径）
 - v3.10.0 推荐配队（0 约束推荐 Top N；必选/排除约束条；同名去重）
 - v3.9.0 主控机制修正（只有主控普攻/重击；换人显式；docs/MECHANICS.md）
 - v3.8.0 横向滚动轴（22px/秒，左侧 sticky）+ 修复甘特行头像被隐藏
