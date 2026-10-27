@@ -64,9 +64,29 @@ def _resolve_all(ds: Dataset, names: list[str]) -> list[str]:
     return ids
 
 
+def _dedupe_by_name(ops: list[Operator]) -> list[Operator]:
+    """同名干员（管理员 男/女等）只留技能最全、稀有度最高的那个。
+
+    配队是"人"的组合，不是客户端数据行的组合；否则会选出两个同名干员。
+    """
+    best: dict[str, Operator] = {}
+    for o in ops:
+        key = o.name_zh or o.char_id
+        cur = best.get(key)
+        if cur is None:
+            best[key] = o
+            continue
+        rank = (len(o.skills), o.rarity or 0, o.char_id)
+        cur_rank = (len(cur.skills), cur.rarity or 0, cur.char_id)
+        if rank > cur_rank:
+            best[key] = o
+    return list(best.values())
+
+
 def pool_of(ds: Dataset, q: TeamQuery) -> tuple[list[Operator], list[str]]:
     base = [o for o in ds.operators.values()
             if any(s.slot == "battle_skill" for s in o.skills.values())]
+    base = _dedupe_by_name(base)
     if q.pool:
         ids, missing = _resolve(ds, q.pool)
         base = [ds.operators[i] for i in ids]
@@ -79,7 +99,7 @@ def pool_of(ds: Dataset, q: TeamQuery) -> tuple[list[Operator], list[str]]:
         if cid not in {o.char_id for o in base}:
             if cid in ds.operators:
                 base.append(ds.operators[cid])
-    return base, miss1 + miss2
+    return _dedupe_by_name(base), miss1 + miss2
 
 
 def _power(op: Operator, level: int, skill_level: int) -> float:

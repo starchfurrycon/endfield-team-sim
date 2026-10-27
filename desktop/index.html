@@ -368,6 +368,20 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
 .axis-scroll::-webkit-scrollbar{height:10px}
 .axis-scroll::-webkit-scrollbar-track{background:var(--sunk)}
 .axis-scroll::-webkit-scrollbar-thumb{background:var(--line2);border:2px solid var(--sunk)}
+
+/* 约束条：必选/排除 chips */
+.constraints{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
+.constraints .hint{font-size:11px;color:var(--muted)}
+.constraints .link{background:transparent;border:1px dashed var(--line2);color:var(--muted);
+  font-size:10px;padding:2px 8px;border-radius:999px;font-family:var(--mono)}
+.constraints .link:hover{border-color:var(--ink);color:var(--ink)}
+.cchip{display:inline-flex;gap:6px;align-items:center;border-radius:999px;
+  padding:3px 9px;font-size:10.5px;border:1px solid var(--line2);background:var(--paper)}
+.cchip .ck{font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--muted)}
+.cchip.must .ck{color:var(--ink);background:var(--yellow);padding:0 4px;border-radius:2px}
+.cchip.ban .ck{color:#fff;background:var(--red);padding:0 4px;border-radius:2px}
+.cchip .cx{color:var(--muted);font-size:11px}
+.av.locked{outline:2px solid var(--yellow);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -410,7 +424,8 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
         <button id="clr" class="icon" title="清空">✕</button>
       </div>
     </div>
-    <div id="result">选择干员</div>
+    <div class="constraints" id="constraints"></div>
+    <div id="result">正在推荐…</div>
   </section>
 </main>
 </div>
@@ -621,6 +636,7 @@ function renderOps(){
         + (o.note ? '\n' + o.note : '');
       box.appendChild(row);
     });
+  renderConstraints();
 }
 
 function picked(kind){ return Object.keys(STATE).filter(k => STATE[k]===kind); }
@@ -643,25 +659,49 @@ function savePrefs(){
 function renderEmpty(){
   const box = $('#result'); box.className = 'cards'; box.innerHTML = '';
   const empty = el('div','empty');
-  empty.appendChild(el('div','empty-t','选 4 名干员'));
-  empty.appendChild(el('div','empty-s','点左侧头像：一次必须 · 两次禁止 · 三次清除'));
-  const b = el('button', null, '示例队伍');
-  b.onclick = () => {
-    ['陈千语','大潘','萤石','埃特拉'].forEach(n => {
-      const o = META.operators.find(x => x.name === n);
-      if(o) STATE[o.id] = 1;
-    });
-    renderOps(); savePrefs(); runTeam();
+  empty.appendChild(el('div','empty-t','没有可用数据'));
+  empty.appendChild(el('div','empty-s','先运行 python run.py update 构建数据集'));
+  box.appendChild(empty);
+}
+
+function applyDemo(){
+  Object.keys(STATE).forEach(k => STATE[k] = 0);
+  const must = META.operators.find(o => o.name === '洛茜');
+  const ban = META.operators.find(o => o.name === '狼卫');
+  if(must) STATE[must.id] = 1;
+  if(ban) STATE[ban.id] = 2;
+  renderOps(); savePrefs(); scheduleRun(0);
+}
+
+function renderConstraints(){
+  const box = $('#constraints');
+  if(!box) return;
+  box.innerHTML = '';
+  const musts = picked(1).map(id => META.operators.find(o => o.id === id)).filter(Boolean);
+  const bans = picked(2).map(id => META.operators.find(o => o.id === id)).filter(Boolean);
+  if(!musts.length && !bans.length){
+    box.appendChild(el('span','hint','不设约束 = 直接推荐全局最优；点干员可设必选/排除'));
+    const b = el('button','link','示例：必选洛茜 · 排除狼卫');
+    b.onclick = applyDemo;
+    box.appendChild(b);
+    return;
+  }
+  const chip = (kind, op, cls) => {
+    const c = el('button','cchip ' + cls);
+    c.appendChild(el('span','ck', kind));
+    c.appendChild(el('span','cn', op.name));
+    c.appendChild(el('span','cx', '×'));
+    c.title = '点击移除';
+    c.onclick = () => { STATE[op.id] = 0; renderOps(); savePrefs(); scheduleRun(); };
+    return c;
   };
-  empty.appendChild(b); box.appendChild(empty);
-  const hm = $('#hero-meta');
-  if(hm && META) hm.textContent = '0 / ' + META.count;
+  musts.forEach(op => box.appendChild(chip('必选', op, 'must')));
+  bans.forEach(op => box.appendChild(chip('排除', op, 'ban')));
 }
 
 async function runTeam(){
   if(!META) return;
   const must = picked(1);
-  if(!must.length){ renderEmpty(); return; }
   const token = ++RUN_TOKEN;
   const btn = $('#go'); btn.disabled = true;
   const hm = $('#hero-meta'); const prevMeta = hm ? hm.textContent : '';
@@ -696,7 +736,9 @@ function renderTeams(data){
     const team = el('div','team');
     t.team.forEach(cid => {
       const op = META.operators.find(o => o.id === cid);
-      team.appendChild(avatar(op || cid, 30, t.name_map[cid]));
+      const av = avatar(op || cid, 30, t.name_map[cid]);
+      if(picked(1).includes(cid)) av.classList.add('locked');
+      team.appendChild(av);
     });
     h.appendChild(team);
     const mods = el('div','tabs');
@@ -1321,7 +1363,7 @@ function renderLLMRun(run){
 $('#go').onclick = runTeam;
 $('#clr').onclick = () => {
   Object.keys(STATE).forEach(k => STATE[k] = 0);
-  renderOps(); savePrefs(); renderEmpty();
+  renderOps(); savePrefs(); scheduleRun(0);
 };
 $('#q').oninput = renderOps;
 ['dur','top','eprofile'].forEach(id => {
@@ -1358,7 +1400,7 @@ function restorePrefs(){
     await loadLLM();
     restorePrefs();
     renderOps();
-    if(picked(1).length) runTeam(); else renderEmpty();
+    runTeam();
   }catch(e){
     $('#result').textContent = e.message;
   }
