@@ -334,6 +334,25 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card-h button.ghost{width:auto;padding:0 9px;font-size:11px;gap:4px}
 .boot-hint{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* 轴上标注 */
+.legend{display:flex;gap:14px;align-items:center;margin:0 0 8px 74px;
+  font-family:var(--mono);font-size:9px;color:var(--muted)}
+.lg-item{display:inline-flex;gap:5px;align-items:center}
+.lg-sw{width:14px;height:8px;display:inline-block;border:1px solid rgba(16,17,16,.35)}
+.lg-sw.power_attack{background:repeating-linear-gradient(45deg,var(--ink) 0 2px,var(--sunk) 2px 5px)}
+.lg-sw.battle_skill{background:var(--bar-battle)}
+.lg-sw.combo_skill{background:var(--bar-combo)}
+.lg-sw.ultimate{background:var(--accent)}
+.lg-sw.enemy{background:repeating-linear-gradient(45deg,var(--red) 0 3px,transparent 3px 6px)}
+.bar-lb{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font:8.5px/1 var(--mono);letter-spacing:.02em;color:#fff;pointer-events:none}
+
+.llm-checks{margin-top:9px;display:grid;gap:2px;font-family:var(--mono);font-size:10px;
+  color:var(--muted);max-height:168px;overflow:auto}
+.llm-checks .chk.ok{color:#2f9e44}
+.llm-checks .chk.bad{color:var(--red)}
+.llm-checks .chk.skip{color:var(--muted2)}
 </style>
 </head>
 <body>
@@ -427,12 +446,14 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
     <div class="row">
       <button id="llm-save">保存</button>
       <button id="llm-test" class="ghost">测试连接</button>
+      <button id="llm-selftest" class="ghost">自检</button>
       <span class="muted" id="llm-msg"></span>
     </div>
     <div class="llm-note">
       只发送技能文本；密钥只存本机 <code id="llm-path">data/llm.json</code>。
     </div>
 
+    <div class="llm-checks" id="llm-checks"></div>
     <div class="llm-run">
       <div class="row">
         <span class="muted">复核范围</span>
@@ -722,18 +743,33 @@ async function loadAxis(t, mode, card){
 function gantt(res, order, nameMap){
   const dur = Math.max(1, res.duration_frames)/30;
   const box = el('div');
+  const legend = el('div','legend');
+  [['power_attack','重击'],['battle_skill','战技'],
+   ['combo_skill','连携'],['ultimate','大招'],['enemy','敌人']].forEach(([k, tx]) => {
+    const item = el('span','lg-item');
+    item.appendChild(el('span','lg-sw ' + k));
+    item.appendChild(el('span','lg-tx', tx));
+    legend.appendChild(item);
+  });
+  box.appendChild(legend);
   const lane = (labelNode, events) => {
     const l = el('div','lane');
     const lb = el('div','lb');
     if(labelNode) lb.appendChild(labelNode);
     l.appendChild(lb);
     const tr = el('div','track');
+    const mark = {battle_skill:'战', combo_skill:'连', ultimate:'终'};
     events.forEach(ev => {
       const s = ev.frame/30, e = Math.max(ev.commit_end||ev.frame, ev.frame+1)/30;
       const b = el('div','bar ' + (ev.bar||''));
       b.style.left = (s/dur*100)+'%';
       b.style.width = Math.max(0.5,(e-s)/dur*100)+'%';
       b.title = `${ev.label} ${s.toFixed(2)}s`;
+      if(mark[ev.bar] && (e-s)/dur*100 >= 1.6){
+        const lb = el('span','bar-lb', mark[ev.bar]);
+        if(ev.bar === 'ultimate') lb.style.color = 'var(--ink)';
+        b.appendChild(lb);
+      }
       tr.appendChild(b);
       (ev.hits||[]).forEach(hf => {
         const hit = el('div','hit'); hit.style.left = ((hf/30)/dur*100)+'%';
@@ -1170,6 +1206,21 @@ $('#llm-test').onclick = async () => {
     $('#llm-msg').textContent = r.ok
       ? `连接成功 · ${r.model} · ${r.latency_ms}ms`
       : `失败：${r.error}`;
+  }catch(e){ $('#llm-msg').textContent = e.message; }
+};
+
+$('#llm-selftest').onclick = async () => {
+  $('#llm-msg').textContent = '自检中…';
+  try{
+    const r = await jpost('/api/llm/selftest');
+    const box = $('#llm-checks'); box.innerHTML = '';
+    (r.checks || []).forEach(c => {
+      const row = el('div', 'chk ' + (c.ok === null ? 'skip' : c.ok ? 'ok' : 'bad'));
+      row.textContent = (c.ok === null ? '○ ' : c.ok ? '✓ ' : '✗ ')
+        + c.name + '：' + (c.detail || '');
+      box.appendChild(row);
+    });
+    $('#llm-msg').textContent = r.ok ? '自检通过' : '自检失败';
   }catch(e){ $('#llm-msg').textContent = e.message; }
 };
 

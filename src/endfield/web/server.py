@@ -169,6 +169,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, llm_save(payload))
             if u.path == "/api/llm/test":
                 return self._json(200, llm_test())
+            if u.path == "/api/llm/selftest":
+                return self._json(200, api.llm_selftest())
             if u.path == "/api/llm/run":
                 if not self._need_data():
                     return None

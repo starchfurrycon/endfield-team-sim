@@ -255,5 +255,10 @@ def llm_test() -> dict:
     return llm.test_connection()
 
 
+def llm_selftest() -> dict:
+    from ..semantics import selftest
+    return selftest.run()
+
+
 def start_llm_run(mode: str = "gaps", limit: int | None = None) -> dict:
     return jobs.start_llm(mode=mode, limit=limit)

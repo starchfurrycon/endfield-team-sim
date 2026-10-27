@@ -287,6 +287,16 @@ def cmd_llm(args) -> int:
         print(f"[llm] 已清理 {llm.clear_cache()} 条缓存")
 
     cfg = llm_config.load()
+    if args.self_test:
+        from .semantics import selftest
+        res = selftest.run(cfg=cfg)
+        for c in res["checks"]:
+            tag = "PASS" if c["ok"] else ("SKIP" if c["ok"] is None else "FAIL")
+            print(f"[llm] {tag}  {c['name']}：{c['detail']}")
+        print(f"[llm] 自检{'通过' if res['ok'] else '失败'}"
+              f"（model={res['model']} · prompt={res['prompt_version']}）")
+        return 0 if res["ok"] else 1
+
     if args.test:
         res = llm.test_connection(cfg)
         if res.get("ok"):
@@ -482,6 +492,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--enable", action="store_true")
     p.add_argument("--disable", action="store_true")
     p.add_argument("--test", action="store_true", help="测试连接")
+    p.add_argument("--self-test", action="store_true",
+                   help="自检：配置/掩码/提示词/规则兜底/缓存/联网标注")
     p.add_argument("--apply", action="store_true", help="对当前数据集跑 LLM 复核")
     p.add_argument("--mechanics", action="store_true",
                    help="同时让 LLM 归类未建模的黑板 key（只写报告）")
