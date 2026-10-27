@@ -295,7 +295,6 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
 .guide{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
 .guide-h{display:flex;gap:10px;align-items:baseline;margin-bottom:8px}
 .guide-h .lat{font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--muted)}
-.guide-h .hint{font-size:10px;color:var(--muted2);margin-left:auto}
 .gsteps{display:flex;gap:6px;flex-wrap:wrap}
 .gstep{display:flex;gap:6px;align-items:center;background:var(--paper);
   border:1px solid var(--line);border-radius:4px;padding:4px 9px;font-size:11px;
@@ -333,7 +332,6 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
 .wl-name{display:inline;font-family:var(--mono);font-size:8.5px;color:var(--muted2);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card-h button.ghost{width:auto;padding:0 9px;font-size:11px;gap:4px}
-.boot-hint{font-size:11px;color:var(--muted);margin-top:2px}
 
 /* 轴上标注 */
 .legend{display:flex;gap:14px;align-items:center;margin:0 0 8px 74px;
@@ -371,10 +369,7 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
 
 /* 约束条：必选/排除 chips */
 .constraints{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 12px}
-.constraints .hint{font-size:11px;color:var(--muted)}
-.constraints .link{background:transparent;border:1px dashed var(--line2);color:var(--muted);
-  font-size:10px;padding:2px 8px;border-radius:999px;font-family:var(--mono)}
-.constraints .link:hover{border-color:var(--ink);color:var(--ink)}
+.constraints:empty{display:none}
 .cchip{display:inline-flex;gap:6px;align-items:center;border-radius:999px;
   padding:3px 9px;font-size:10.5px;border:1px solid var(--line2);background:var(--paper)}
 .cchip .ck{font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--muted)}
@@ -433,7 +428,6 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
 <div id="boot">
   <div class="boot-card">
     <h2 id="boot-title">准备数据…</h2>
-    <div class="boot-hint">首次启动需联网下载数据（约 1–3 分钟）</div>
     <div class="bar-outer"><div class="bar-inner" id="boot-bar"></div></div>
     <div class="boot-meta"><span id="boot-msg"></span><span id="boot-pct">0%</span></div>
     <div class="boot-err" id="boot-err" hidden></div>
@@ -464,7 +458,6 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
       <span class="muted">启用</span>
       <label style="display:flex;gap:8px;align-items:center;font-size:12px">
         <input type="checkbox" id="llm-enabled" />
-        <span class="muted">勾选后，重建数据时自动用 LLM 复核语义</span>
       </label>
       <span class="muted">接口</span>
       <input type="text" id="llm-base" placeholder="https://api.deepseek.com/v1" />
@@ -480,7 +473,7 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
       <span class="muted" id="llm-msg"></span>
     </div>
     <div class="llm-note">
-      只发送技能文本；密钥只存本机 <code id="llm-path">data/llm.json</code>。
+      密钥仅存本机
     </div>
 
     <div class="llm-checks" id="llm-checks"></div>
@@ -488,7 +481,7 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
       <div class="row">
         <span class="muted">复核范围</span>
         <select id="llm-mode">
-          <option value="gaps">仅不确定（省 token）</option>
+          <option value="gaps">仅不确定</option>
           <option value="all">全部技能</option>
         </select>
         <span class="muted">上限</span>
@@ -659,18 +652,8 @@ function savePrefs(){
 function renderEmpty(){
   const box = $('#result'); box.className = 'cards'; box.innerHTML = '';
   const empty = el('div','empty');
-  empty.appendChild(el('div','empty-t','没有可用数据'));
-  empty.appendChild(el('div','empty-s','先运行 python run.py update 构建数据集'));
+  empty.appendChild(el('div','empty-t','无数据'));
   box.appendChild(empty);
-}
-
-function applyDemo(){
-  Object.keys(STATE).forEach(k => STATE[k] = 0);
-  const must = META.operators.find(o => o.name === '洛茜');
-  const ban = META.operators.find(o => o.name === '狼卫');
-  if(must) STATE[must.id] = 1;
-  if(ban) STATE[ban.id] = 2;
-  renderOps(); savePrefs(); scheduleRun(0);
 }
 
 function renderConstraints(){
@@ -679,13 +662,7 @@ function renderConstraints(){
   box.innerHTML = '';
   const musts = picked(1).map(id => META.operators.find(o => o.id === id)).filter(Boolean);
   const bans = picked(2).map(id => META.operators.find(o => o.id === id)).filter(Boolean);
-  if(!musts.length && !bans.length){
-    box.appendChild(el('span','hint','不设约束 = 直接推荐全局最优；点干员可设必选/排除'));
-    const b = el('button','link','示例：必选洛茜 · 排除狼卫');
-    b.onclick = applyDemo;
-    box.appendChild(b);
-    return;
-  }
+  if(!musts.length && !bans.length) return;
   const chip = (kind, op, cls) => {
     const c = el('button','cchip ' + cls);
     c.appendChild(el('span','ck', kind));
@@ -855,7 +832,6 @@ function guideBlock(g){
   const wrap = el('div','guide');
   const head = el('div','guide-h');
   head.appendChild(el('span','lat','怎么打'));
-  head.appendChild(el('span','hint','按时间从上到下'));
   wrap.appendChild(head);
   const row = el('div','gsteps');
   (g.steps||[]).forEach(s => {
@@ -1011,7 +987,7 @@ function renderAxis(res, t, cfg, guide){
   const meta = el('div','meta-line');
   const det = el('details');
   const sum = el('summary', null, 'ⓘ 详情');
-  sum.title = '细节：动作表 / 警告 / 未建模项';
+  sum.title = '动作表 / 警告 / 未建模';
   det.appendChild(sum);
   if(res.legality_issues && res.legality_issues.length){
     det.appendChild(el('div','warn', res.legality_issues.slice(0,3).join('; ')));
@@ -1231,7 +1207,8 @@ function fillLLM(){
   $('#llm-key').value = '';
   $('#llm-key').placeholder = LLM.has_key
     ? `已保存（${LLM.key_masked}），留空不修改` : '粘贴 API key';
-  $('#llm-path').textContent = LLM.config_path || 'data/llm.json';
+  const lp = $('#llm-path');
+  if(lp) lp.textContent = LLM.config_path || 'data/llm.json';
   renderLLMRun(LLM.run || {});
 }
 
@@ -1353,7 +1330,7 @@ function renderLLMRun(run){
       out.appendChild(line);
     }
     const hint = el('div', 'llm-note',
-      '报告：data/reports/llm-review.md（建议人工过一遍「被改写」表）');
+      '已生成复核报告');
     out.appendChild(hint);
   }
 }
