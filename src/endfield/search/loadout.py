@@ -81,6 +81,28 @@ def _role_cn(role: str) -> str:
             "healer": "治疗"}.get(role, role)
 
 
+def _power(op: Operator) -> float:
+    """静态主 C 判据：ATK × 最高技能倍率 / 承诺帧。"""
+    atk = float(op.stat_at(90).get("atk") or 0.0)
+    best = 0.0
+    for sk in (op.skills or {}).values():
+        if sk.slot in ("battle_skill", "ultimate", "combo_skill"):
+            commit = max(1, sk.timing.commit_frames or 30)
+            best = max(best, sk.total_multiplier(12) * atk / commit)
+    return best
+
+
+def _team_roles(ds: Dataset, team: list[str]) -> dict[str, str]:
+    roles = {cid: _role(ds.operators[cid]) for cid in team if cid in ds.operators}
+    dps = [cid for cid, r in roles.items() if r == "dps"]
+    if len(dps) > 1:
+        main = max(dps, key=lambda cid: _power(ds.operators[cid]))
+        for cid in dps:
+            if cid != main:
+                roles[cid] = "support"
+    return roles
+
+
 def _weapon_type(op: Operator) -> int | None:
     w = _weapons().get(op.default_weapon_id or "")
     return (w or {}).get("weapon_type")
@@ -292,11 +314,11 @@ def _set_pieces(sid: str, srow: dict, items: dict, main_id: int,
 
 
 def recommend_equipment(ds: Dataset, cid: str, top: int = 1,
-                        level: int = 3) -> list[dict]:
+                        level: int = 3, role: str | None = None) -> list[dict]:
     op = ds.operators.get(cid)
     if not op:
         return []
-    role = _role(op)
+    role = role or _role(op)
     main_id = _MAIN_ATTR_ID.get(op.main_attr or "", 0)
     items = _equip().get("items") or {}
     suits = _equip().get("suits") or {}
@@ -336,13 +358,13 @@ def _score_team(ds: Dataset, team: list[str], weapons: dict, equips: dict,
 def optimize_team(ds: Dataset, team: list[str], duration_s: float = 40.0,
                   rounds: int = 2) -> dict:
     """坐标下降：固定其他人，逐个换武器/套装，取队伍总伤最高。"""
-    op_roles = {cid: _role(ds.operators[cid]) for cid in team if cid in ds.operators}
+    op_roles = _team_roles(ds, team)
     weapons: dict[str, str] = {}
     equips: dict[str, list[str]] = {}
     for cid in team:
         ws = recommend_weapons(ds, cid, top=4)
         weapons[cid] = ws[0]["weapon_id"] if ws else ""
-        es = recommend_equipment(ds, cid, top=1)
+        es = recommend_equipment(ds, cid, top=1, role=op_roles.get(cid))
         equips[cid] = list(es[0]["pieces"]) if es else []
     cache: dict[tuple, float] = {}
 
@@ -367,7 +389,7 @@ def optimize_team(ds: Dataset, team: list[str], duration_s: float = 40.0,
                     best, olds, changed = s, row["weapon_id"], True
             weapons[cid] = olds
             olde = list(equips[cid])
-            for row in recommend_equipment(ds, cid, top=4):
+            for row in recommend_equipment(ds, cid, top=4, role=op_roles.get(cid)):
                 equips[cid] = list(row["pieces"])
                 s = score()
                 if s > best + 1e-6:
@@ -383,7 +405,7 @@ def optimize_team(ds: Dataset, team: list[str], duration_s: float = 40.0,
             continue
         ws = recommend_weapons(ds, cid, top=4)
         wsel = next((w for w in ws if w["weapon_id"] == weapons[cid]), ws[0])
-        es = recommend_equipment(ds, cid, top=1)
+        es = recommend_equipment(ds, cid, top=1, role=op_roles.get(cid))
         out[cid] = {
             "name": op.name_zh, "role": op_roles.get(cid, "support"),
             "role_cn": _role_cn(op_roles.get(cid, "support")),
@@ -401,15 +423,17 @@ def recommend_for_team(ds: Dataset, team: list[str], top_weapons: int = 3,
     if optimize:
         opt = optimize_team(ds, team, duration_s=duration_s)
         return opt["roles"]
+    roles = _team_roles(ds, team)
     out = {}
     for cid in team:
         op = ds.operators.get(cid)
         if not op:
             continue
-        out[cid] = {"name": op.name_zh, "role": _role(op),
-                    "role_cn": _role_cn(_role(op)),
+        out[cid] = {"name": op.name_zh, "role": roles.get(cid, _role(op)),
+                    "role_cn": _role_cn(roles.get(cid, _role(op))),
                     "weapons": recommend_weapons(ds, cid, top=top_weapons),
-                    "equipment": recommend_equipment(ds, cid, top=top_sets)}
+                    "equipment": recommend_equipment(
+                        ds, cid, top=top_sets, role=roles.get(cid))}
     return out
 
 
