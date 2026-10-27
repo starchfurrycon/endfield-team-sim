@@ -100,26 +100,23 @@ def build(ds: Dataset, sc: Scenario, res: Result) -> dict:
 
     tips: list[str] = []
     if steps:
-        head = steps[:3]
-        seq = " → ".join(f"{s['label']}" for s in head)
-        first = head[0]
-        tips.append(f"开场 {first['t']:.1f}s 起手：{seq}"
-                    + (f"（{first['name']}先动）" if first["name"] else ""))
+        labels = [s["label"] for s in steps[:3]]
+        seq = (f"{labels[0]} ×{len(labels)}" if len(set(labels)) == 1
+               else " → ".join(labels))
+        tips.append(f"开场：{seq}")
     if combos:
-        parts = [f"{'/'.join(v)} {k}" for k, v in combos.items()]
-        tips.append("连携别空放：" + "；".join(parts))
+        tips.append("连携：" + " / ".join(combos.keys()))
     caps = (res.stats or {}).get("energy_cap") or {}
     if caps:
-        nums = {cid: int(round(v)) for cid, v in caps.items() if cid in names}
+        nums = [str(int(round(caps[cid]))) for cid in sc.team if cid in caps]
         if nums:
-            tips.append("终结技攒满再放：" + " / ".join(
-                f"{names[cid]} {n}" for cid, n in nums.items()))
+            tips.append("大招（队序）：" + " / ".join(nums))
     if not tips:
-        tips.append("这条轴没有技能施放：检查技力/能量是否足够。")
+        tips.append("没有技能施放：检查技力/能量。")
 
     return {
         "steps": steps,
         "tips": tips[:3],
         "casts": (res.stats or {}).get("cast_counts") or {},
-        "note": "放技能时别切走：承诺帧内换人会丢掉这次伤害。",
+        "note": "技能承诺帧内别切人。",
     }

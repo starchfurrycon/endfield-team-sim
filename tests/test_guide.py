@@ -55,7 +55,7 @@ class TestGuide(unittest.TestCase):
         if not caps:
             self.skipTest("no energy caps")
         text = " ".join(self.g["tips"])
-        self.assertIn("终结技", text)
+        self.assertIn("大招", text)
 
     def test_note_mentions_commit_frames(self):
         self.assertIn("承诺帧", self.g["note"])

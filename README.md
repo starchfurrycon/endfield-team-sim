@@ -1,4 +1,4 @@
-# 随心配（Suixinpei）· v3.5.0
+# 随心配（Suixinpei）· v3.6.0
 
 《明日方舟：终末地》的**自动配队 + 输出轴**桌面工具。
 
@@ -26,7 +26,7 @@
 
 ### 方式 A：下载桌面版（推荐）
 
-从 Releases 下载 `suixinpei-3.5.0-win64.zip`，解压后双击：
+从 Releases 下载 `suixinpei-3.6.0-win64.zip`，解压后双击：
 
 ```
 随心配.exe

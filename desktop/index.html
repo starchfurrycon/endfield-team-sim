@@ -146,7 +146,7 @@ button:disabled{opacity:.4;cursor:default}
 .ticks .t span:first-child{transform:none}
 /* 水位 */
 .wl{position:relative;margin:12px 0 2px}
-.wl-row{display:grid;grid-template-columns:44px minmax(0,1fr) 34px;gap:10px;align-items:center;
+.wl-row{display:grid;grid-template-columns:64px minmax(0,1fr) 34px;gap:10px;align-items:center;
   margin:3px 0}
 .wl-row .lb{display:flex;gap:5px;align-items:center;overflow:hidden}
 .wl-row .track{height:16px;background:transparent;border-bottom:1px solid var(--line)}
@@ -312,6 +312,28 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
 .empty-t{font-size:16px;font-weight:600;margin-bottom:4px}
 .empty-s{font-size:11px;color:var(--muted);margin-bottom:12px}
 #result.busy{opacity:.45;transition:opacity .15s}
+
+/* 带字的药丸 */
+.tools .pill{display:flex;align-items:center;gap:6px;background:var(--ink);color:#fff;
+  border-radius:999px;padding:5px 12px;font-family:var(--mono);font-size:10px}
+.tools .pill > span{color:#a9ada8;font-size:9px;letter-spacing:.06em}
+.tools .pill input,.tools .pill select{background:transparent;border:0;color:#fff;
+  padding:0;width:auto;font-size:11px;font-family:var(--mono)}
+.tools .pill input[type=number]{width:26px;text-align:center}
+.tools .pill select{appearance:none;padding-right:14px;
+  background-image:linear-gradient(45deg,transparent 50%,#fff 50%),
+                   linear-gradient(135deg,#fff 50%,transparent 50%);
+  background-position:calc(100% - 6px) 55%,calc(100% - 2px) 55%;
+  background-size:4px 4px;background-repeat:no-repeat}
+.elems-label{font-family:var(--mono);font-size:9px;color:#8b8f8a;letter-spacing:.1em;
+  margin-right:2px}
+.wl-head{display:grid;grid-template-columns:64px minmax(0,1fr) 34px;gap:10px;
+  font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:4px}
+.wl-head span:last-child{text-align:right}
+.wl-name{display:inline;font-family:var(--mono);font-size:8.5px;color:var(--muted2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card-h button.ghost{width:auto;padding:0 9px;font-size:11px;gap:4px}
+.boot-hint{font-size:11px;color:var(--muted);margin-top:2px}
 </style>
 </head>
 <body>
@@ -340,14 +362,16 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
         <span class="meta" id="hero-meta"></span>
       </div>
       <div class="tools">
-        <input id="dur" type="number" value="40" title="时间窗口（秒）"/>
-        <select id="eprofile" title="敌人出手节奏">
-          <option value="normal">敌 8s</option>
-          <option value="slow">敌 12s</option>
-          <option value="fast">敌 5s</option>
-          <option value="burst">敌 4s</option>
-        </select>
-        <input id="top" type="number" value="3" title="Top N"/>
+        <label class="pill"><span>时长</span><input id="dur" type="number" value="40"/><span>s</span></label>
+        <label class="pill"><span>敌人</span>
+          <select id="eprofile">
+            <option value="normal">8s</option>
+            <option value="slow">12s</option>
+            <option value="fast">5s</option>
+            <option value="burst">4s</option>
+          </select>
+        </label>
+        <label class="pill"><span>Top</span><input id="top" type="number" value="3"/></label>
         <button id="go">推荐</button>
         <button id="clr" class="icon" title="清空">✕</button>
       </div>
@@ -360,6 +384,7 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
 <div id="boot">
   <div class="boot-card">
     <h2 id="boot-title">准备数据…</h2>
+    <div class="boot-hint">首次启动需联网下载数据（约 1–3 分钟）</div>
     <div class="bar-outer"><div class="bar-inner" id="boot-bar"></div></div>
     <div class="boot-meta"><span id="boot-msg"></span><span id="boot-pct">0%</span></div>
     <div class="boot-err" id="boot-err" hidden></div>
@@ -523,6 +548,7 @@ async function loadMeta(){
 
 function renderElems(){
   const box = $('#elems'); box.innerHTML = '';
+  box.appendChild(el('span','elems-label','元素'));
   const all = el('button','chip-btn' + (ELEM===''?' on':''), '');
   all.title = '全部';
   all.innerHTML = '<i style="background:#5b6472"></i>';
@@ -626,7 +652,7 @@ async function runTeam(){
 function renderTeams(data){
   const box = $('#result'); box.className = 'cards'; box.innerHTML = '';
   const hm = $('#hero-meta');
-  if(hm && META) hm.textContent = (data.top ? data.top.length : 0) + ' / ' + META.count;
+  if(hm && META) hm.textContent = (data.top ? data.top.length : 0) + ' 队 · ' + META.count + ' 人';
   if(!data.top || !data.top.length){ box.appendChild(el('div','muted','无符合条件的队伍')); return; }
   data.top.forEach((t, i) => {
     const card = el('div','card');
@@ -649,16 +675,16 @@ function renderTeams(data){
       mods.appendChild(b);
     });
     h.appendChild(mods);
-    const eq = el('button','ghost','▤'); eq.title = '装备 / 武器';
+    const eq = el('button','ghost','▤ 装备'); eq.title = '装备 / 武器';
     eq.onclick = () => loadLoadout(t, card);
-    const cp = el('button','ghost','⇄'); cp.title = '对比';
+    const cp = el('button','ghost','⇄ 对比'); cp.title = '对比';
     cp.onclick = () => openCompare(t);
     h.appendChild(eq); h.appendChild(cp);
     card.appendChild(h);
     const kpi = el('div','kpi');
     kpi.appendChild(kpiEl('cold','冷', t.cold.result.dps));
     kpi.appendChild(kpiEl('hot','热', t.hot.result.dps));
-    const tot = el('div','dim2','Σ ' + fmt(t.cold.result.total_damage));
+    const tot = el('div','dim2','总伤 ' + fmt(t.cold.result.total_damage));
     kpi.appendChild(tot);
     card.appendChild(kpi);
     const holder = el('div'); holder.id = 'axis-'+i; card.appendChild(holder);
@@ -819,13 +845,19 @@ function waterlines(res, order, nameMap){
     return r;
   };
 
-  const spLabel = el('span', null, 'SP');
+  const head = el('div','wl-head');
+  head.appendChild(el('span', null, '技力 / 能量'));
+  head.appendChild(el('span', null, '上限'));
+  wrap.appendChild(head);
+  const spLabel = el('span', null, '技力');
   wrap.appendChild(row(spLabel, '#101110', spMax, s=>s.sp, null));
   order.forEach((cid, i) => {
     const op = META.operators.find(o => o.id === cid);
-    wrap.appendChild(row(avatar(op || cid, 16, nameMap[cid]),
+    const r = row(avatar(op || cid, 16, nameMap[cid]),
       OP_COLORS[i % OP_COLORS.length], caps[cid] || 100,
-      s=>((s.e||{})[cid]||0), cid));
+      s=>((s.e||{})[cid]||0), cid);
+    r.querySelector('.lb').appendChild(el('span','wl-name', nameMap[cid] || ''));
+    wrap.appendChild(r);
   });
 
   if(samples.length){
@@ -880,7 +912,7 @@ function renderAxis(res, t, cfg, guide){
 
   const meta = el('div','meta-line');
   const det = el('details');
-  const sum = el('summary', null, 'ⓘ');
+  const sum = el('summary', null, 'ⓘ 详情');
   sum.title = '细节：动作表 / 警告 / 未建模项';
   det.appendChild(sum);
   if(res.legality_issues && res.legality_issues.length){
