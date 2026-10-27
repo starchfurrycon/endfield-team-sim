@@ -1,6 +1,6 @@
 # 记忆文件 · 随心配（Suixinpei）
 
-> 最后更新：2026-10-26 · 版本 **v3.13.0**
+> 最后更新：2026-10-26 · 版本 **v3.13.1**
 > 这份文件用来交接：项目是什么、代码在哪、怎么跑、边界在哪、下一步可以做什么。
 
 ## 1. 身份
@@ -8,12 +8,12 @@
 - 软件名 / 仓库：**随心配** / `starchfurrycon/suixinpei`
 - 定位：《明日方舟：终末地》的**配队 + 输出轴**桌面工具
 - 技术栈：Python 3.10+（仅标准库） + 单页 HTML/JS + Electron 便携壳
-- 最新发行：https://github.com/starchfurrycon/suixinpei/releases/tag/v3.13.0
+- 最新发行：https://github.com/starchfurrycon/suixinpei/releases/tag/v3.13.1
 
 | 产物 | 大小 | SHA256 |
 |---|---|---|
-| `suixinpei-3.13.0-win64.zip` | 114,505,364 | `46794E140440EFC12F7C7D92AA3C09FEED19EB31FCCBF6AE6D04293CBD9B6DE0` |
-| `suixinpei-server-3.13.0-win64.zip` | 9,315,212 | `3216C9CFA403B08388BCD4B85FAAA984C92C43E717D25DC83E8049264E1197DC` |
+| `suixinpei-3.13.1-win64.zip` | 114,506,087 | `B5E006272DF51D3B82D2156E814B08A4FD28B4F2904F4D3496E7EB27554FC166` |
+| `suixinpei-server-3.13.1-win64.zip` | 9,315,937 | `6D8759BB596B36C307FCB3BF51FC42BAF75633AEBB7AE762C7742AC789DF06E5` |
 
 ## 2. 边界（先读这条）
 
@@ -85,7 +85,8 @@ python tools/package_desktop.py                # 需要 electron + rcedit
 
 ## 7. 近期版本
 
-- v3.13.0 短字幕演示 + 哈基米风原创 BGM + BYO API 说明
+- v3.13.1 演示静音（无配音/无配乐，仅短字幕）
+- v3.13.0 短字幕演示 + BYO API 说明
 - v3.12.0 默认约束版本隔离 + Top3 多样化 + 真实录屏演示
 - v3.11.0 主控轨 / 可取消窗口 / 深链 + 宣传片（docs/media）
 - v3.10.1 清掉界面说明文字（示例/勾选说明/报告路径）
