@@ -282,18 +282,28 @@ class TestLoadout(unittest.TestCase):
         scores = [r["score"] for r in recs]
         self.assertEqual(scores, sorted(scores, reverse=True))
 
-    def test_equipment_two_sets_with_slots(self):
+    def test_equipment_is_complete_set(self):
         from endfield.search import loadout
         ds = _ds()
         cid = ds.resolve("陈千语").char_id
-        sets = loadout.recommend_equipment(ds, cid, top=2)
-        self.assertEqual(len(sets), 2)
+        sets = loadout.recommend_equipment(ds, cid, top=1)
+        self.assertEqual(len(sets), 1)
         for s in sets:
             self.assertEqual(len(s["pieces"]), 4)
+            self.assertGreaterEqual(s["set_count"], s["need"])
             body = sum(1 for x in s["pieces"] if "_body_" in x)
             hand = sum(1 for x in s["pieces"] if "_hand_" in x)
             edc = sum(1 for x in s["pieces"] if "_edc_" in x)
             self.assertEqual((body, hand, edc), (1, 1, 2))
+
+    def test_signature_weapon_first(self):
+        from endfield.search import loadout
+        ds = _ds()
+        op = ds.resolve("伊冯")
+        rows = loadout.recommend_weapons(ds, op.char_id, top=3)
+        self.assertEqual(rows[0]["name"], "艺术暴君")
+        self.assertEqual(rows[0]["tier"], "专武")
+        self.assertEqual(rows[1]["tier"], "大月卡")
 
 
 if __name__ == "__main__":

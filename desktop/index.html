@@ -386,6 +386,11 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
 .bar-tail{position:absolute;top:2px;height:16px;z-index:0;
   background:rgba(16,17,16,.05);border:1px dashed rgba(16,17,16,.4)}
 .lg-sw.cancel{background:transparent;border:1px dashed var(--ink)}
+
+.tag{font-family:var(--mono);font-size:9px;padding:1px 5px;border-radius:2px;
+  background:var(--yellow);color:var(--ink);letter-spacing:.06em}
+.tier{color:var(--ink);background:var(--yellow);padding:0 3px;border-radius:2px;
+  font-size:10px;font-weight:600}
 </style>
 </head>
 <body>
@@ -1095,21 +1100,25 @@ async function loadLoadout(t, card){
       const op = META.operators.find(o => o.name === row.name);
       head.appendChild(avatar(op || row.name, 22, row.name));
       head.appendChild(el('span','muted', row.name));
+      if(row.role_cn) head.appendChild(el('span','tag', row.role_cn));
       blk.appendChild(head);
       const tb = el('table');
-      tb.innerHTML = '<tr><th>武器</th><th>ATK</th><th>ATK%</th><th>主属</th><th>等效</th></tr>';
+      tb.innerHTML = '<tr><th>武器</th><th>阶</th><th>ATK</th><th>评分</th></tr>';
       (row.weapons||[]).forEach(w => {
         const tr = el('tr');
-        tr.innerHTML = `<td>${w.name || w.weapon_id}</td><td>${w.atk}</td>`+
-          `<td>${(w.atk_pct*100).toFixed(0)}%</td><td>+${w.mainattr}</td><td>${fmt(w.score)}</td>`;
+        tr.innerHTML = `<td>${w.name || w.weapon_id}</td>`+
+          `<td>${w.tier ? '<b class="tier">'+w.tier+'</b>' : ''}</td>`+
+          `<td>${w.atk}</td><td>${fmt(w.score)}</td>`;
         tb.appendChild(tr);
       });
       blk.appendChild(tb);
       (row.equipment||[]).forEach(s => {
         const pieces = (s.piece_names && s.piece_names.length) ? s.piece_names : s.pieces;
-        const line = el('div','muted', s.label + '：' + pieces.join('、'));
-        line.title = (s.pieces||[]).join('\n');
+        const name = s.set_name ? `${s.set_name}（${s.set_count||0} 件套）` : (s.label || '套装');
+        const line = el('div','muted', name + (s.set_effect ? ' · ' + s.set_effect : ''));
+        line.title = pieces.join('、') + '\n' + (s.pieces||[]).join('\n');
         blk.appendChild(line);
+        blk.appendChild(el('div','muted', pieces.join('、')));
       });
       box.appendChild(blk);
     }
