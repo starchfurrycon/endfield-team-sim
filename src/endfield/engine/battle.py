@@ -423,6 +423,8 @@ class Battle:
                 "dmg_slot": {},           # 按技能槽位的效率加成
                 "dmg_element": {},        # 按元素（伤害类型）的加成
                 "dmg_stagger": 0.0,       # 对失衡单位的伤害加成
+                "crit_rate": 0.0,         # 武器/套装暴击率（期望值）
+                "crit_dmg": 0.0,          # 武器/套装暴击伤害
                 "heal_bonus": 0.0,        # 治疗量加成（不参与伤害）
                 "ai": 0.0, "bb": [], "applied": [], "ignored_attrs": []}
 
@@ -588,6 +590,10 @@ class Battle:
                     m["dmg_bonus"] += v
                     m["applied"].append(f"SET:dmg+{v:.1%}")
                     continue
+                if attr == "__crit_rate__":
+                    m["crit_rate"] += v
+                    m["applied"].append(f"SET:crit+{v:.1%}")
+                    continue
                 if attr.startswith("__attr_"):
                     k2 = attr[7:]
                     m["attrs"][k2] = m["attrs"].get(k2, 0.0) + v
@@ -648,6 +654,20 @@ class Battle:
                         m["attrs"]["__mainattr__"] = (
                             m["attrs"].get("__mainattr__", 0.0) + float(v))
                         m["applied"].append(f"W:mainattr+{float(v):g}")
+                    elif k in ("crirate", "crit_rate"):
+                        m["crit_rate"] += float(v)
+                        m["applied"].append(f"W:crit+{float(v):.1%}")
+                    elif k in ("critdmg", "crit_dmg"):
+                        m["crit_dmg"] += float(v)
+                        m["applied"].append(f"W:critdmg+{float(v):.1%}")
+                    else:
+                        elem = ("寒冷" if "cryst" in k else "灼热" if "fire" in k
+                                else "电磁" if "pulse" in k else "自然" if "nature" in k
+                                else "物理" if "phy" in k else None)
+                        if elem and (k.endswith("dam") or k.endswith("_dmg_up")):
+                            m["dmg_element"][elem] = (
+                                m["dmg_element"].get(elem, 0.0) + float(v))
+                            m["applied"].append(f"W:{elem}+{float(v):.1%}")
 
             out[cid] = m
         return out
@@ -703,6 +723,9 @@ class Battle:
             d *= 1.0 + float((m.get("dmg_slot") or {}).get(slot, 0.0))
         if element:
             d *= 1.0 + float((m.get("dmg_element") or {}).get(element, 0.0))
+        base_crit = float(self.ops[cid].stat_at(self.sc.level).get("crit_rate") or 0.05)
+        crit = min(1.0, base_crit + float(m.get("crit_rate", 0.0)))
+        d *= 1.0 + crit * (0.5 + float(m.get("crit_dmg", 0.0)))
         d *= 100.0 / (max(0.0, self.sc.enemy_def) + 100.0)
         d *= max(0.0, 1.0 - res)
         if self.staggered_until > frame:

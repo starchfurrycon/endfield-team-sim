@@ -42,6 +42,7 @@ class TeamResult:
     hot: dict
     score: float
     reason: list[str]
+    loadouts: dict = field(default_factory=dict)
 
 
 def _resolve(ds: Dataset, names: list[str]) -> tuple[list[str], list[str]]:
@@ -154,18 +155,32 @@ def evaluate_team(ds: Dataset, team: list[Operator], q: TeamQuery,
     names = [o.name_zh or o.char_id for o in team]
     base = dict(level=level, skill_level=skill_level, duration_s=q.duration_s,
                 main=q.main or ids[0])
+    # 队伍候选在评估时就用"每人最佳武器 + 整套套装"，
+    # 避免先按默认武器选队、再补装备的错位。
+    from . import loadout as lo
+    recs = lo.recommend_for_team(ds, ids, top_weapons=1, top_sets=1,
+                                 optimize=False)
+    weapons = {cid: (r["weapons"][0]["weapon_id"] if r.get("weapons") else "")
+               for cid, r in recs.items()}
+    equips = {cid: list((r.get("equipment") or [{}])[0].get("pieces") or [])
+              for cid, r in recs.items()}
     try:
         cold, hot = search_pair(
             ds,
-            Scenario(team=ids, start_energy="cold", **base),
-            Scenario(team=ids, start_energy="hot", **base))
+            Scenario(team=ids, start_energy="cold", weapon_by_op=weapons,
+                     equip_by_op=equips, **base),
+            Scenario(team=ids, start_energy="hot", weapon_by_op=weapons,
+                     equip_by_op=equips, **base))
     except Exception:  # noqa: BLE001
         return None
     score = 0.5 * cold.result.dps + 0.5 * hot.result.dps
     reasons = _reasons(ds, team, cold, hot)
     return TeamResult(team=ids, names=names,
                       cold=cold.to_dict(), hot=hot.to_dict(),
-                      score=round(score, 2), reason=reasons)
+                      score=round(score, 2), reason=reasons,
+                      loadouts={cid: {"weapon": weapons.get(cid),
+                                      "equipment": equips.get(cid)}
+                                for cid in ids})
 
 
 def _reasons(ds: Dataset, team: list[Operator], cold, hot) -> list[str]:

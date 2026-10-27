@@ -17,7 +17,7 @@ ROOT = Path('.').resolve()
 DESKTOP = ROOT / 'desktop'
 ELECTRON = DESKTOP / 'node_modules' / 'electron' / 'dist'
 RCEDIT = DESKTOP / 'node_modules' / 'rcedit' / 'bin' / 'rcedit-x64.exe'
-APP_VERSION = '3.14.1'
+APP_VERSION = '3.15.0'
 OUT = ROOT / 'release' / f'随心配-{APP_VERSION}-win64'
 
 if OUT.exists():
