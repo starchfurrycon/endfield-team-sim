@@ -306,10 +306,6 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
 .gtips{margin-top:9px;display:grid;gap:3px}
 .gtip{font-size:11px;color:var(--ink2)}
 .gnote{font-size:10px;color:var(--muted2);margin-top:7px}
-.empty{background:var(--card);border:1px dashed var(--line2);border-radius:4px;
-  padding:28px;text-align:center}
-.empty-t{font-size:16px;font-weight:600;margin-bottom:4px}
-.empty-s{font-size:11px;color:var(--muted);margin-bottom:12px}
 #result.busy{opacity:.45;transition:opacity .15s}
 
 /* 带字的药丸 */
@@ -377,6 +373,19 @@ details h4,.detail-h{font-family:var(--mono);font-size:10px;letter-spacing:.14em
 .cchip.ban .ck{color:#fff;background:var(--red);padding:0 4px;border-radius:2px}
 .cchip .cx{color:var(--muted);font-size:11px}
 .av.locked{outline:2px solid var(--yellow);outline-offset:2px}
+
+/* 主控轨 / 可取消窗口 */
+.main-track{background:var(--sunk)}
+.main-seg{position:absolute;top:2px;height:16px;display:flex;align-items:center;
+  gap:4px;padding-left:3px;overflow:hidden;border-radius:2px}
+.main-seg .av{box-shadow:0 0 0 1px rgba(255,255,255,.7);flex:0 0 auto}
+.sw-mark{position:absolute;top:-1px;width:0;height:0;border-left:5px solid transparent;
+  border-right:5px solid transparent;border-bottom:6px solid var(--ink);
+  transform:translateX(-5px);z-index:3}
+.main-lb{font-family:var(--mono);font-size:9px;letter-spacing:.08em;color:var(--muted)}
+.bar-tail{position:absolute;top:2px;height:16px;z-index:0;
+  background:rgba(16,17,16,.05);border:1px dashed rgba(16,17,16,.4)}
+.lg-sw.cancel{background:transparent;border:1px dashed var(--ink)}
 </style>
 </head>
 <body>
@@ -649,13 +658,6 @@ function savePrefs(){
   }catch(e){}
 }
 
-function renderEmpty(){
-  const box = $('#result'); box.className = 'cards'; box.innerHTML = '';
-  const empty = el('div','empty');
-  empty.appendChild(el('div','empty-t','无数据'));
-  box.appendChild(empty);
-}
-
 function renderConstraints(){
   const box = $('#constraints');
   if(!box) return;
@@ -777,6 +779,41 @@ async function loadAxis(t, mode, card){
 function gantt(res, order, nameMap){
   const dur = Math.max(1, res.duration_frames)/30;
   const box = el('div');
+  // 主控轨：谁在场上、什么时候换人（这是本工具相对"循环表"的差异点）
+  const mainRow = el('div','lane');
+  const mlb = el('div','lb');
+  mlb.appendChild(el('span','main-lb','主控'));
+  mainRow.appendChild(mlb);
+  const mainTrack = el('div','track main-track');
+  const switches = (res.timeline || []).filter(e => e.kind === 'switch')
+    .sort((a, b) => a.frame - b.frame);
+  const segs = [];
+  let t0 = 0, cur = order[0];
+  switches.forEach(ev => {
+    segs.push([t0, ev.frame / 30, cur]);
+    t0 = ev.frame / 30;
+    cur = ev.op;
+  });
+  segs.push([t0, dur, cur]);
+  segs.forEach(([a, b, cid]) => {
+    const idx = Math.max(0, order.indexOf(cid));
+    const seg = el('div','main-seg');
+    seg.style.left = (a / dur * 100) + '%';
+    seg.style.width = Math.max(0.4, (b - a) / dur * 100) + '%';
+    seg.style.background = OP_COLORS[idx % OP_COLORS.length];
+    const op = META.operators.find(o => o.id === cid);
+    seg.title = (nameMap[cid] || cid) + ' · 主控';
+    seg.appendChild(avatar(op || cid, 14, nameMap[cid]));
+    mainTrack.appendChild(seg);
+    if(a > 0){
+      const mark = el('span','sw-mark');
+      mark.style.left = (a / dur * 100) + '%';
+      mainTrack.appendChild(mark);
+    }
+  });
+  mainRow.appendChild(mainTrack);
+  box.appendChild(mainRow);
+
   const lane = (labelNode, events) => {
     const l = el('div','lane');
     const lb = el('div','lb');
@@ -790,6 +827,14 @@ function gantt(res, order, nameMap){
       b.style.left = (s/dur*100)+'%';
       b.style.width = Math.max(0.5,(e-s)/dur*100)+'%';
       b.title = `${ev.label} ${s.toFixed(2)}s`;
+      const endF = (ev.frame_end || ev.commit_end || ev.frame) / 30;
+      if(endF > e + 0.05){
+        const tail = el('div','bar-tail');
+        tail.style.left = (e / dur * 100) + '%';
+        tail.style.width = Math.max(0.3, (endF - e) / dur * 100) + '%';
+        tail.title = '可取消 ' + (endF - e).toFixed(2) + 's';
+        tr.appendChild(tail);
+      }
       if(mark[ev.bar] && (e-s)/dur*100 >= 1.6){
         const lb = el('span','bar-lb', mark[ev.bar]);
         if(ev.bar === 'ultimate') lb.style.color = 'var(--ink)';
@@ -951,7 +996,8 @@ function renderAxis(res, t, cfg, guide){
   const order = t.team, nameMap = t.name_map || {};
   const legend = el('div','legend');
   [['power_attack','重击'],['battle_skill','战技'],
-   ['combo_skill','连携'],['ultimate','大招'],['enemy','敌人']].forEach(([k, tx]) => {
+   ['combo_skill','连携'],['ultimate','大招'],['cancel','可取消'],
+   ['enemy','敌人']].forEach(([k, tx]) => {
     const item = el('span','lg-item');
     item.appendChild(el('span','lg-sw ' + k));
     item.appendChild(el('span','lg-tx', tx));
@@ -1358,6 +1404,43 @@ function initShell(){
 
 }
 
+async function runPanel(){
+  const panel = new URLSearchParams(location.search).get('panel');
+  if(!panel) return;
+  if(panel === 'llm'){
+    const b = $('#llm-btn'); if(b) b.click();
+    if(new URLSearchParams(location.search).get('selftest')){
+      setTimeout(() => { const s = $('#llm-selftest'); if(s) s.click(); }, 800);
+    }
+    return;
+  }
+  const card = document.querySelector('#result .card');
+  if(!card) return;
+  const btn = (txt) => [...card.querySelectorAll('button')]
+    .find(x => (x.textContent || '').includes(txt));
+  if(panel === 'compare'){
+    const b = btn('对比');
+    if(b){ b.click(); setTimeout(() => { const run = $('#cmp-run'); if(run) run.click(); }, 700); }
+  } else if(panel === 'loadout'){
+    const b = btn('装备'); if(b) b.click();
+    setTimeout(() => { const m = $('#main'); if(m) m.scrollTop = m.scrollHeight; }, 900);
+  }
+}
+
+function applyQuery(){
+  const ps = new URLSearchParams(location.search);
+  const must = (ps.get('must') || '').split(',').map(s => s.trim()).filter(Boolean);
+  const ban = (ps.get('ban') || '').split(',').map(s => s.trim()).filter(Boolean);
+  const dur = ps.get('range');
+  if(dur){ const d = $('#dur'); if(d) d.value = dur; }
+  if(!must.length && !ban.length) return;
+  Object.keys(STATE).forEach(k => STATE[k] = 0);
+  META.operators.forEach(o => {
+    if(must.includes(o.name)) STATE[o.id] = 1;
+    if(ban.includes(o.name)) STATE[o.id] = 2;
+  });
+}
+
 function restorePrefs(){
   try{
     const st = JSON.parse(localStorage.getItem('sx.state') || '{}');
@@ -1376,8 +1459,10 @@ function restorePrefs(){
     await loadMeta();
     await loadLLM();
     restorePrefs();
+    applyQuery();
     renderOps();
     runTeam();
+    setTimeout(runPanel, 1600);
   }catch(e){
     $('#result').textContent = e.message;
   }

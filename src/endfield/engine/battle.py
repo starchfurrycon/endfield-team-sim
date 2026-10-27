@@ -48,8 +48,6 @@ class Scenario:
     weapon_level: int = 90          # 默认武器等级（满级）
     main: str | None = None
     seed: int = 0
-    # 只有主控（controlled）能普攻/重击；研究结论见 docs/MECHANICS.md
-    offfield_auto_attack: bool = False
     potential_level: int = 0      # 潜能等级 0~5（默认不点）
     equip_ids: list[str] = field(default_factory=list)   # 4 件装备（全队同一套，默认空）
     equip_level: int = 3          # 精锻等级 0~3

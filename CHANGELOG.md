@@ -1,5 +1,18 @@
 # Changelog
 
+## v3.11.0 (2026-10-26)
+
+**把差异点做成看得见的功能，并补一支全流程宣传片。**
+
+- **主控轨**：轴顶部新增"谁在场上"的时间条，换人处有标记；
+- **可取消窗口**：每根技能条后面画出 commit 之后的 duration 尾巴（虚线），
+  一眼看出"这段可以取消/接下一招"——这是循环表给不了的；
+- **深链**：`?must=洛茜&ban=狼卫&range=60` 可直接带约束打开，`&panel=compare|llm|loadout`
+  直接展开对应面板（分享轴/做演示都方便）；
+- 清理死代码：移除 `offfield_auto_attack`、`AUTO_ATTACK_GAP_FRAMES`、未用的 `renderEmpty`；
+- 宣传片：`docs/media/suixinpei-promo.mp4`（68s，全流程：推荐 → 约束 → 轴 → 怎么打 →
+  对比 → 装备 → LLM 自检），附截图源 `docs/media/src/`。
+
 ## v3.10.1 (2026-10-26)
 
 **清掉界面里的调试/说明文字。**
