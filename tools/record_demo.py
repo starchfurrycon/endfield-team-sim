@@ -8,14 +8,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-import math
-import random
 import shutil
 import subprocess
 import tempfile
 import threading
 import time
-import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -46,17 +43,6 @@ SCENES = [
     ('diversity', 'Top3 会换核心', 1),
     ('end', '', 0),
 ]
-
-
-def tts_hook(path: Path) -> None:
-    script = (
-        "Add-Type -AssemblyName System.Speech;"
-        "$s=New-Object System.Speech.Synthesis.SpeechSynthesizer;"
-        "$s.SelectVoice('Microsoft Huihui Desktop');$s.Rate=3;"
-        f"$s.SetOutputToWaveFile('{path}');$s.Speak('哈基米 哈基米 哈基米 哈基米');$s.Dispose()"
-    )
-    subprocess.run(['powershell', '-NoProfile', '-Command', script],
-                   check=True, capture_output=True)
 
 
 async def wait_loaded(page):
@@ -213,68 +199,6 @@ def caption(img: Image.Image, text: str) -> Image.Image:
     return Image.alpha_composite(img.convert('RGBA'), layer).convert('RGB')
 
 
-# ------------------------- 音乐（哈基米风原创） -------------------------
-def load_mono(path: Path) -> bytes:
-    with wave.open(str(path), 'rb') as w:
-        return w.readframes(w.getnframes())
-
-
-def music(path: Path, hook: Path | None, seconds: float) -> None:
-    sr = 44100
-    n = int(sr * seconds)
-    buf = [0.0] * n
-    beat = 60 / 140          # 140 BPM
-    bar = beat * 4
-    # 主旋律：C5-E5-G5 的儿歌式重复（哈基米二创常见的 C-E-G 动机）
-    notes = [523.25, 659.25, 783.99, 659.25]
-    for i in range(int(seconds / (beat / 2)) + 1):
-        hz = notes[i % len(notes)] * (2 if i % 8 >= 4 else 1)
-        start = int(i * beat / 2 * sr)
-        ln = int(beat / 2 * sr * 0.85)
-        for k in range(ln):
-            if start + k >= n:
-                break
-            t = k / sr
-            env = math.exp(-7 * t) * min(1, k / 120)
-            buf[start + k] += (1 if math.sin(2 * math.pi * hz * t) > 0 else -1) * 0.10 * env
-    # 低音与鼓
-    for b in range(int(seconds / beat) + 1):
-        start = int(b * beat * sr)
-        root = 130.81 if (b // 4) % 2 == 0 else 98.0
-        for k in range(int(beat * sr * 0.7)):
-            if start + k >= n:
-                break
-            t = k / sr
-            buf[start + k] += math.sin(2 * math.pi * root * t) * 0.13 * math.exp(-6 * t)
-        for k in range(int(0.06 * sr)):
-            if start + k >= n:
-                break
-            buf[start + k] += (random.random() * 2 - 1) * 0.045 * math.exp(-60 * k / sr)
-        if b % 2 == 1:
-            for k in range(int(0.05 * sr)):
-                if start + k >= n:
-                    break
-                buf[start + k] += (random.random() * 2 - 1) * 0.09 * math.exp(-50 * k / sr)
-    # 哈基米人声 hook（TTS 变调，像猫叫/儿歌）
-    if hook and hook.exists():
-        raw = load_mono(hook)
-        h = memoryview(raw).cast('h')
-        hop = len(h)
-        for b in range(0, max(1, int(seconds / (bar * 2))) + 1):
-            start = int(b * bar * 2 * sr)
-            for k in range(hop):
-                if start + k >= n:
-                    break
-                buf[start + k] += (h[k] / 32768.0) * 0.55
-    with wave.open(str(path), 'wb') as w:
-        w.setnchannels(1)
-        w.setsampwidth(2)
-        w.setframerate(sr)
-        w.writeframes(b''.join(
-            int(max(-1, min(1, x)) * 32767).to_bytes(2, 'little', signed=True)
-            for x in buf))
-
-
 # ------------------------- 合成 -------------------------
 def main() -> None:
     work = Path(tempfile.mkdtemp(prefix='demo-'))
@@ -321,14 +245,6 @@ def main() -> None:
             'temperature': 0, 'max_tokens': 2048, 'timeout_s': 30,
             'price_in': 0, 'price_out': 0}, ensure_ascii=False), encoding='utf-8')
 
-        # 哈基米 hook：TTS 后升调
-        hook = work / 'hook.wav'
-        tts_hook(hook)
-        hook_p = work / 'hook_p.wav'
-        subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(hook),
-                        '-af', 'asetrate=22050*1.45,aresample=44100,atempo=0.85',
-                        '-ac', '1', '-ar', '44100', str(hook_p)], check=True)
-
         async def run():
             async with async_playwright() as pw:
                 b = await pw.chromium.launch(channel='msedge', headless=True)
@@ -360,21 +276,10 @@ def main() -> None:
                 idx += 1
 
         total = sum(durs.values())
-        mus = work / 'music.wav'
-        music(mus, hook_p, total + 1)
-
-        video = work / 'video.mp4'
+        OUT.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-framerate', str(FPS),
                         '-i', str(frames_dir / '%05d.jpg'), '-c:v', 'libx264',
-                        '-pix_fmt', 'yuv420p', '-crf', '20', str(video)], check=True)
-        OUT.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run([
-            'ffmpeg', '-y', '-loglevel', 'error', '-i', str(video),
-            '-i', str(mus),
-            '-filter_complex',
-            f'[1:a]volume=0.55,atrim=0:{total:.2f},loudnorm=I=-16:TP=-1.5:LRA=11[a]',
-            '-map', '0:v', '-map', '[a]', '-c:v', 'copy', '-c:a', 'aac',
-            '-b:a', '128k', '-shortest', str(OUT)], check=True)
+                        '-pix_fmt', 'yuv420p', '-crf', '20', str(OUT)], check=True)
         print('video', OUT, round(OUT.stat().st_size / 1048576, 1), 'MB', round(total, 1), 's')
     finally:
         Path('data/llm.json').unlink(missing_ok=True)
