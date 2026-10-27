@@ -57,7 +57,7 @@ python run.py team --must 陈千语 --top 3 --duration 40
 python run.py axis --team 陈千语,大潘,萤石,埃特拉 --mode both
 
 python run.py llm --base https://api.deepseek.com/v1 --model deepseek-chat \
-                  --key sk-xxx --enable        # 配置（只存 data/llm.json）
+                  --key YOUR_API_KEY --enable        # 配置（只存 data/llm.json）
 python run.py llm --self-test                  # 能力自检（6 类）
 python run.py llm --apply --mode gaps --limit 5
 

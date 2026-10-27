@@ -45,7 +45,7 @@ SKIP  LLM 标注：未配置 API（跳过联网）
 
 ```bash
 python run.py llm --base https://api.deepseek.com/v1 --model deepseek-chat \
-                  --key sk-xxx --enable
+                  --key YOUR_API_KEY --enable
 python run.py llm --self-test          # 六类检查 + 一次真实标注
 python run.py llm --apply --mode gaps --limit 5   # 小样本复核，看报告
 ```

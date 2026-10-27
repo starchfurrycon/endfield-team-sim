@@ -15,7 +15,7 @@ from endfield.semantics import apply as sem_apply   # noqa: E402
 from endfield.semantics import llm, schema, selftest  # noqa: E402
 
 CFG = {"enabled": True, "base": "http://stub/v1", "model": "stub-model",
-       "key": "sk-test-123456", "temperature": 0, "max_tokens": 2048,
+       "key": "test-key-123456", "temperature": 0, "max_tokens": 2048,
        "timeout_s": 10, "price_in": 0, "price_out": 0}
 
 TEXT = "当敌人处于过载状态时，造成电磁伤害并附加感电。"

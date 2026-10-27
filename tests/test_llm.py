@@ -99,7 +99,7 @@ class LLMTestBase(unittest.TestCase):
         for f in config.LLM_CACHE.glob("sem_*.json"):
             f.unlink()
         llm_config.save({"enabled": True, "base": "https://api.example.com/v1",
-                         "model": "test-model", "key": "sk-test-1234567890"})
+                         "model": "test-model", "key": "test-key-1234567890"})
         self._reports = sem_apply.REPORTS
         sem_apply.REPORTS = self.tmp / "reports"
         sem_apply.REPORTS.mkdir(parents=True, exist_ok=True)
@@ -116,7 +116,7 @@ class TestConfig(LLMTestBase):
         self.assertEqual(cfg["model"], "test-model")
         pub = llm_config.public(cfg)
         self.assertTrue(pub["has_key"])
-        self.assertNotIn("sk-test-1234567890", json.dumps(pub, ensure_ascii=False))
+        self.assertNotIn("test-key-1234567890", json.dumps(pub, ensure_ascii=False))
         self.assertIn("•••", pub["key_masked"])
         self.assertTrue(llm_config.available(cfg))
 
@@ -323,7 +323,7 @@ class TestServerLLM(LLMTestBase):
         from endfield.web import server
         st = server.llm_status()
         self.assertTrue(st["available"])
-        self.assertNotIn("sk-test-1234567890",
+        self.assertNotIn("test-key-1234567890",
                          json.dumps(st, ensure_ascii=False))
         self.assertIn("prompt_version", st)
 

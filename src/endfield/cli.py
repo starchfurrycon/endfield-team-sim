@@ -318,7 +318,7 @@ def cmd_llm(args) -> int:
     if not llm_config.available(cfg):
         print("[llm] 未配置 API（需要 enabled + key）。先执行：")
         print("  python run.py llm --base https://api.deepseek.com/v1 "
-              "--model deepseek-chat --key sk-xxx --enable")
+              "--model deepseek-chat --key YOUR_API_KEY --enable")
         return 2
     stats = sem_apply.apply_to_operators(
         ops, use_llm=True, mode=args.mode, limit=args.limit, cfg=cfg)

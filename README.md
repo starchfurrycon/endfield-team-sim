@@ -1,4 +1,4 @@
-# 随心配（Suixinpei）· v3.12.0
+# 随心配（Suixinpei）· v3.13.0
 
 《明日方舟：终末地》的**自动配队 + 输出轴**桌面工具。
 
@@ -22,13 +22,17 @@
 > 绝对数值会偏低，请只用它做**相对比较**。
 > 详见 [`CHANGELOG.md`](CHANGELOG.md) 的「已知限制」。
 
+> **API 与密钥**：本仓库和发行包**不包含任何 API Key，也不内置 API 服务**。
+> LLM 是可选功能，需要你自己填 OpenAI 兼容接口；Key 只存本机 `data/llm.json`
+> （已在 `.gitignore`），不会进入 git 或发行包。
+
 ## 不是又一个循环表
 
 - **帧级轴**：commit 与 duration 分开画，带「可取消窗口」；顶部有**主控轨**，
   换人位置有标记；不是把技能排个序。
 - **换人建模**：只有主控能普攻/重击，换人付开销；战技/终结技需主控，
   连携是插入动作（见 [`docs/MECHANICS.md`](docs/MECHANICS.md)）。
-- **LLM 自更新**：自带 API，语义复核有**证据校验**、**自检**和**复核报告**；
+- **LLM 自更新**：接自己的 API（BYO），语义复核有**证据校验**、**自检**和**复核报告**；
   规则通道永远兜底。
 
 ---
@@ -199,7 +203,7 @@ BWIKI 语义   ──┘                    └─ 中文描述/天赋/潜能
 
 ---
 
-## LLM 自更新（可选，自带 API）
+## LLM 自更新（可选，接自己的 API（BYO））
 
 游戏更新后，真正会变的不只是"多了个干员"，还有**新技能文本的机制含义**
 （触发条件、元素、异常、角色定位）。这部分规则层覆盖不全，LLM 正好补位。
@@ -214,7 +218,7 @@ BWIKI 语义   ──┘                    └─ 中文描述/天赋/潜能
 2. **命令行**：
    ```bash
    python run.py llm --base https://api.deepseek.com/v1 \
-                      --model deepseek-chat --key sk-xxx --enable
+                      --model deepseek-chat --key YOUR_API_KEY --enable
    python run.py llm --test
    ```
 3. **环境变量**（CI 用）：`ENDFIELD_LLM_BASE` / `ENDFIELD_LLM_MODEL` /
